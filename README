@@ -1,0 +1,10 @@
+Project is just beginning, i have made algorithm and database schema, and just beginning to code now.
+
+As i am a system admin, rdiffopke will be written in Perl.
+
+rdiffopke is a reverse differential backup tool using offline private key encryption protocol
+
+You can compare it to rdiff-backup, except that all files are encrypted, and rdiffopke never needs knowledge of private key to retrieve, compare and store files and increments.
+The only time when the private key is needed is for interactive browsing of the stored files, and restoring.
+
+
