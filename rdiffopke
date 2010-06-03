@@ -1,5 +1,6 @@
 #!/usr/bin/perl
 
+
 use strict;
 sub verbose_message($);
 sub subscribe_to_signals;
@@ -338,10 +339,10 @@ sub _dbh {
 
 sub set_message {
     my ( $self, $message ) = @_;
+    
+    
                $self->_dbh->do(
-               "update diffs set message = $message where diff = ${self->diff};"
-               erreur, le diff n est pas toujours connu
-            );
+               "update diffs set message = $message where diff = ${self->diff};"            ) if ($self->diff);
 
 
 }
