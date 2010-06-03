@@ -88,60 +88,14 @@ exit 0;
 
 sub test_init_repository {
   
+    
+   
+
+    
+    
+    
 }
 
-
-sub create_metadata_db($){
-        my $current_db_version = shift;
-
-          my %db_schema_versions = (
-            1 => [
-'create table diffs (diff integer primary key not null, date_begin datetime not null, date_end datetime not null, message text);',
-'create table options (name text primary key not null, value text);',
-'create table files (file_id integer primary key autoincrement not null, diff integer not null, path_id integer not null, localfile_id integer, retrieval_date datetime not null, owner text, "group" text, mode text, mdate datetime not null, type text not null, size integer not null, target text );',
-'create table paths (path_id integer primary key autoincrement not null, path text not null);',
-'create table localfiles (localfile_id integer primary key autoincrement not null, path text not null, size integer not null, key_id integer);',
-'create table keys ( key_id integer primary key autoincrement not null, key blob not null);',
-            ],          );
-          
-            
-            $dbh = DBI->connect( "dbi:SQLite:dbname=$params{dbfile}", "", "" );
-          quit_error( 7) if (!defined $dbh);
-
-          for ( my $i = $current_db_version + 1 ; $i <= $db_version ; $i++ ) {
-
-            eval {
-                local $dbh->{RaiseError} = 1;
-                local $dbh->{PrintError} = 0;
-                $dbh->begin_work;
-                foreach (  @{$db_schema_versions{$i} } ) {
-                    $DB::single = 1;
-                    $dbh->do($_);
-                }
-                $dbh->do(
-                    "update options set value = $i where name = 'db_version';");
-            };
-            if ($@) {
-                $dbh->rollback;
-                quit_error( 7, $@ ) if ($@);
-
-            }
-            else {
-                $dbh->commit;
-            }
-        }
-      }
-
-      sub create_print_opke_keys {
-    }
-
-    sub get_public_key {
-
-        # TODO read the public   key file and return it
-    }
-
-    
-    
 
     
 __END__
