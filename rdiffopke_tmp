@@ -1,0 +1,147 @@
+#!/usr/bin/perl
+
+# WORK IN PROGRESS
+# IT DOES NOT WORK YET !
+
+my $version    = 0.1;
+my $db_version = 1;
+
+use Data::Dumper;
+use strict;
+
+sub import_required_modules;
+sub get_params;
+sub test_init_repository;
+sub get_public_key;
+sub register_signals;
+sub verbose_message($);
+sub quit_error;
+sub create_metadata_db($);
+sub create_print_opke_keys;
+
+import_required_modules;
+
+my %params = ();
+get_params;
+
+# test_init_repository() will return a valid $metadata and $pubkey objects, and $current_diff
+my $metadata;
+my $pubkey;
+my $current_diff;
+
+register_signals;
+test_init_repository;
+
+# TODO   parse parameters
+
+# TODO   get public key from file
+
+# TODO   connect to remote
+# TODO   do some ls test, read test on remote
+# TODO   mark as process begun
+
+# TODO   take la derniere revision de la table revision. c'est Rev-1
+# TODO   Ajoute 1 a Rev-1 et cree nouvelle revision Rev dans table revision, avec aussi la date de debut
+# TODO   update tous les items de la table filerev qui ont Rev-1 et update a Rev
+# TODO   renomme le repertoire Rev-1 en Rev
+
+# TODO   generate a blowfish 448b key for file encryption : Simkey
+# TODO   add pub(Simkey) to table sym_keys
+
+# TODO   get list of current dir content, this is %files
+# TODO   get list of known files in latest revision for this directory. this is %in_latest_rev
+# TODO   for each item in %files (including dir and symlink names)
+# TODO       encrypt all metadata for this file with public key
+# TODO       if item is in %files but not in %in_latest_rev, then
+# TODO           calculate localpath
+# TODO           calculate salted hash of file content
+# TODO           store all data to DB, but set file_rev.status to transferring
+# TODO           get the file and stream to zip and stream to encryption to disk at localpath
+# TODO           if no error, set file_rev.status to null, otherwise set as error or call reconnect and retry if just deconnected
+# TODO      else if item is in %files and in %in_latest_rev; then
+# TODO           if metadata is different ;then
+# TODO               calculate salted hash content
+# TODO               if hash content is different, then
+# TODO                    add a new entry in table files
+# TODO                    move the old file to Rev-1 local directory
+# TODO                   update all records from table  filerev which had revision 'Rev' to Rev-1
+# TODO                   write new file to current revision localpath -> have a function that get content, path, and will encrypt with Simkey
+# TODO                   add new record in table localfiles, with the id of the SimKey
+# TODO                   add metadata of the new file in table filerev with revision Rev, and id of localfiles table record
+# TODO                else  # hash content is same
+# TODO                     just add metadata of the new file in table filerev with revision Rev.
+# TODO                endif # hash content is different
+# TODO           else
+# TODO               do nothing, since nothing has changed
+# TODO           endif
+# TODO       endfor
+
+# TODO       for all items in %in_latest_rev that were not seen in previous loop  (items deleted)
+# TODO           move the old file to Rev-1 local directory
+# TODO           update all records from table  filerev which had revision 'Rev' to Rev-1
+# TODO       endfor
+
+# TODO   mark process finished
+
+exit 0;
+
+
+sub test_init_repository {
+  
+}
+
+
+sub create_metadata_db($){
+        my $current_db_version = shift;
+
+          my %db_schema_versions = (
+            1 => [
+'create table diffs (diff integer primary key not null, date_begin datetime not null, date_end datetime not null, message text);',
+'create table options (name text primary key not null, value text);',
+'create table files (file_id integer primary key autoincrement not null, diff integer not null, path_id integer not null, localfile_id integer, retrieval_date datetime not null, owner text, "group" text, mode text, mdate datetime not null, type text not null, size integer not null, target text );',
+'create table paths (path_id integer primary key autoincrement not null, path text not null);',
+'create table localfiles (localfile_id integer primary key autoincrement not null, path text not null, size integer not null, key_id integer);',
+'create table keys ( key_id integer primary key autoincrement not null, key blob not null);',
+            ],          );
+          
+            
+            $dbh = DBI->connect( "dbi:SQLite:dbname=$params{dbfile}", "", "" );
+          quit_error( 7) if (!defined $dbh);
+
+          for ( my $i = $current_db_version + 1 ; $i <= $db_version ; $i++ ) {
+
+            eval {
+                local $dbh->{RaiseError} = 1;
+                local $dbh->{PrintError} = 0;
+                $dbh->begin_work;
+                foreach (  @{$db_schema_versions{$i} } ) {
+                    $DB::single = 1;
+                    $dbh->do($_);
+                }
+                $dbh->do(
+                    "update options set value = $i where name = 'db_version';");
+            };
+            if ($@) {
+                $dbh->rollback;
+                quit_error( 7, $@ ) if ($@);
+
+            }
+            else {
+                $dbh->commit;
+            }
+        }
+      }
+
+      sub create_print_opke_keys {
+    }
+
+    sub get_public_key {
+
+        # TODO read the public   key file and return it
+    }
+
+    
+    
+
+    
+__END__

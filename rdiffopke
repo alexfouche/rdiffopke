@@ -1,0 +1,327 @@
+#!/usr/bin/perl
+
+
+use strict;
+
+# Check if required Perl modules are installed and import them
+Rdiffopke->import_required_modules;
+
+
+my $rdiffopke = Rdiffopke->new;
+subscribe_to_signals $rdiffopke;
+$rdiffopke->begin_rdiff;
+$rdiffopke->get_params_and_input;
+$rdiffopke->init_repository;
+$rdiffopke->check_source;
+$rdiffopke->proceed;
+$rdiffopke->terminate;
+
+# We should never get there
+exit -1; 
+
+###############################
+#
+# Miscelleaneous functions 
+#
+###############################
+
+
+sub subscribe_to_signals {
+    my $rdiffopke = shift;
+    $SIG{INT} = sub {$rdiffopke->quit_error(10); }
+    $SIG{TERM} = sub {$rdiffopke->quit_error(11); }
+}
+
+
+sub verbose_message {
+       print localtime(time) . "   $message\n" ;
+}
+
+
+###############################
+#
+# Class:  Rdiffopke 
+#
+###############################
+
+package Rdiffopke;
+
+sub import_required_modules {
+    my @modules =
+      qw( Net::FTP::File Getopt::Std DBI DBD::SQLite   );
+      # File::Path::Hashed Path::Class Path::Class::File Path::Class::Dir
+    my @messages = ();
+
+    foreach (@modules) {
+        eval "use $_";
+        push @messages, $_ if ($@);
+    }
+
+    if (@messages) {
+        print STDERR "Some Perl modules are missing for rdiffopke to run. Missing:\n";
+        print STDERR "$_\n" foreach (@messages);
+        exit 1;
+    }
+}
+
+sub new { 
+return bless {}; }
+
+
+sub get_params_and_input {
+         my $self  = shift;
+         my $getopts = {};
+    
+    getopts( 'vu:p:d:s:ic:x', $getopts ) or quit_error(8);
+
+    $self{verbose}       = 1 if ( $getopts->{v} );
+    $self{no_encryption} = $getopts->{x};
+    $self{source}        = $getopts->{s};
+    $self{localdir}      = $getopts->{d};
+    $self{keyfile}       = $self{localdir} . '/pubkey';
+    $self{dbfile}        = $self{localdir} . '/metadata';
+
+    unless ( $self{source} &&  $self{localdir}  ) {
+        $self->quit_error 8;
+    }
+    
+    
+}
+
+sub init_repository {
+        my $self  = shift;
+    
+        $self->{repository} = Rdiffopke::Repository->new( dir=>$self->{localdir});
+        
+        
+        
+}
+
+
+sub repository {
+        my $self  = shift;
+        return $self->{repository};
+}
+
+
+sub terminate {
+       my ($self, $code, $message)  = shift;
+ $self->{metadata}->set_message("${code}- $message") if (defined $code);
+
+ $self->repository->close;
+ exit 0;
+}
+ 
+
+sub quit_error {
+    my ( $self, $error_code, @messages ) = shift;
+
+    my %errors = (
+        1 => "Some Perl modules are missing for rdiffopke to run.\n",
+        2 => "$params{localdir} is neither writable nor browseable -> aborting",
+        3 =>
+"$params{localdir} has files inside but is missing the public key file '$params{keyfile}' -> aborting",
+        4 =>
+"You have requested no encryption but there is a public key file '$params{keyfile}' -> aborting",
+        5 =>
+"There is a metadata file '$params{dbfile}' but the public key file '$params{keyfile}' is missing ! Set to 'no encryption' if you never used it there -> aborting",
+        6 =>
+          "Metadata file '$params{dbfile}' seems to be corrupted. It should be a SQLite database -> aborting",
+        7 => "An error occurred while initializing metadata '$params{dbfile}' file -> aborting",
+        8 =>
+"Usage: $0 [-v] [-u <username>] [-p <password>] [-x] [-c <credentials_file>] [-i] -s <source> -d <local_destination_dir>
+
+-i read credentials from stdin
+
+-l list increments
+
+-x disable encryption
+delete increments
+
+-? size opke key
+-? size blowfish key
+-? size read buffer
+-? nb threads (default no threads)
+thorough verify
+
+
+il faudrait une option pour tout verifier
+
+Note:
+Source only support local directory or ftp:// at this time",
+        9 => "Could not read metadata version from metadata file '$params{dbfile}' -> aborting",
+        10=> "Killed (SIGTERM)",
+        11=> "Aborted by user (SIGINT)",
+
+
+    );
+
+    print STDERR localtime(time) . "   $errors{$error_code}\n";
+    foreach (@messages) {
+        print STDERR localtime(time) . "   $_\n";
+    }
+    
+    $self->terminate($error_code, $errors{$error_code});
+   }
+
+ 
+###############################
+#
+# Class:  Rdiffopke::Metadata 
+#
+###############################
+
+package Rdiffopke::Metadata;
+
+sub new {
+    my %params = @_;
+    
+ my %self = 
+    
+    
+    $self->_connect;
+    return bless \%self;
+    
+}
+
+sub _connect {
+       my $self = shift;
+       my $dbh = DBI->connect( "dbi:SQLite:dbname=${self->{metadata_file}}", "", "" );
+       if 
+}
+
+sub errstr {
+my $self = shift;
+return $self->{errstr};
+}
+
+sub schema_version {
+ # TODO get metadata schema_version   
+}
+
+sub upgrade_schema_to {
+        my ($self, $to_version) = shift;
+  
+          my %db_schema_versions = (
+            1 => [
+'create table diffs (diff integer primary key not null, date_begin datetime not null, date_end datetime not null, message text);',
+'create table options (name text primary key not null, value text);',
+'create table files (file_id integer primary key autoincrement not null, diff integer not null, path_id integer not null, localfile_id integer, retrieval_date datetime not null, owner text, "group" text, mode text, mdate datetime not null, type text not null, size integer not null, target text );',
+'create table paths (path_id integer primary key autoincrement not null, path text not null);',
+'create table localfiles (localfile_id integer primary key autoincrement not null, path text not null, size integer not null, key_id integer);',
+'create table keys ( key_id integer primary key autoincrement not null, key blob not null);',
+            ],          );
+        
+}
+
+ 
+###############################
+#
+# Class:  Rdiffopke::Repository 
+#
+###############################
+
+package Rdiffopke::Repository;
+
+sub new {
+    my %params = @_;
+    my $self = {};
+    
+    
+    
+          if ( -e $params{localdir} ) {
+        $self->quit_error 3 unless ( -d $params{localdir} );
+    }
+    else {
+        verbose_message
+          "Creating local reverse-diffs directory $params{localdir}" if ( $self->{verbose} );
+        mkdir $params{localdir};
+    }
+
+    quit_error 2
+      unless ( -d $params{localdir}
+        && -x $params{localdir}
+        && -w $params{localdir} );
+
+    quit_error 3 if ( !-e $params{keyfile} && !$params{no_encryption} && <$params{localdir}/*> );
+
+    quit_error 4 if ( $params{no_encryption} && -e $params{keyfile} );
+
+    quit_error 5
+      if ( -e $params{dbfile}
+        && !-e $params{keyfile}
+        && !$params{no_encryption} );
+
+    create_print_opke_keys
+    
+      if ( !-e $params{keyfile} && !$params{no_encryption} );
+
+    if ( -e $params{dbfile} ) {
+
+        $dbh = DBI->connect( "dbi:SQLite:dbname=$params{dbfile}", "", "" );
+        quit_error 6 unless ( defined $dbh );
+   my $current_db_version = undef;
+        eval {    local $dbh->{RaiseError} = 1;
+                local $dbh->{PrintError} = 0;
+               $DB::single = 1;
+         $current_db_version = $dbh->selectrow_array(
+            'select value from options where name = "db_version";');
+          };
+          quit_error( 9 ) if ($@);
+        
+        quit_error 9
+          unless ( defined($current_db_version) && $current_db_version > 0 );
+        create_metadata_db($current_db_version)
+          if ( $current_db_version < $db_version );
+
+    }
+    else {
+        create_metadata_db(0);
+        $current_diff = 1;
+    }
+    local $dbh->{PrintError} = 0;
+        
+    $dbh->do("PRAGMA foreign_keys = ON");
+    $dbh->do("PRAGMA default_synchronous = OFF");
+    
+
+        
+    return bless {};
+}
+
+sub open {
+        my $self  = shift;
+    
+}
+
+sub close {
+        my $self  = shift;
+    
+}
+sub check {
+        my $self  = shift;
+    
+}
+
+sub metadata {
+        my $self  = shift;
+        return $self->{metadata};    
+}
+
+
+sub schema_version {
+        my $self  = shift;
+        return $self->{metadata}->schema_version;
+        }
+
+sub upgrade_schema_to {
+        my ($self, $to_version) = shift;
+        verbose_message("Metadata schema needs upgrade, do not interrupt...") if ( $self->{verbose} )
+        return $self->{metadata}->upgrade_schema_to($to_version);
+        verbose_message("Finished upgrade of metadata schema") if ( $self->{verbose} )
+}
+
+
+
+
+
