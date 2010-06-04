@@ -46,7 +46,7 @@ sub verbose_message($) {
 package Rdiffopke;
 
 sub import_required_modules {
-    my @modules = qw( Net::FTP::File Getopt::Std DBI DBD::SQLite   );
+    my @modules = qw(  Getopt::Std DBI DBD::SQLite   );
 
     # File::Path::Hashed Path::Class Path::Class::File Path::Class::Dir
     my @messages = ();
@@ -79,7 +79,7 @@ sub get_params_and_input {
     $self->{source}        = $getopts->{s};
     $self->{repo_dir}      = $getopts->{d};
 
-    unless ( $self->{source} && $self->{localdir} ) {
+    unless ( $self->{source} && $self->{repo_dir} ) {
  $DB::single = 1;
                $self->quit_error(8);
     }
@@ -118,9 +118,10 @@ sub repository {
 
 sub terminate {
     my ( $self, $code, $message ) = @_;
-    $self->repository->set_message("${code}- $message") if ( defined $code );
+     
+    $self->repository->set_message("${code}- $message") if ( defined ($code) && defined ($self->repository));
 
-    $self->repository->close;
+    $self->repository->close if (  defined ($self->repository));
     exit 0;
 }
 
@@ -189,13 +190,14 @@ Source only support local directory or ftp:// at this time",
 package Rdiffopke::Metadata;
 
 sub new {
-
+	my $class = shift;
     my %params = @_;
+    $DB::single = 1;
     return unless ( defined $params{dir} );
     return bless {
         dir        => $params{dir},
         error_code => 0,
-        verbose    => $params{verbose}
+        verbose    => $params{verbose},  filename    => "$params{dir}/metadata"
     };
 
 }
@@ -251,9 +253,9 @@ sub init {
             return 0;    # $self->error_code is already set
         }
 
-        return 1;        # Returns true
-
     }
+        
+     return 1;        # Returns true
 }
 
 sub _connect {
@@ -340,11 +342,17 @@ sub _dbh {
 sub set_message {
     my ( $self, $message ) = @_;
     
-    
+     $DB::single = 1;
                $self->_dbh->do(
                "update diffs set message = $message where diff = ${self->diff};"            ) if ($self->diff);
 
 
+}
+
+
+sub diff {
+  my $self = shift;
+    return $self->{diff};
 }
 
 ###############################
@@ -356,6 +364,8 @@ sub set_message {
 package Rdiffopke::Repository;
 
 sub new {
+		my $class = shift;
+	$DB::single = 1;
     my %params = @_;
     return unless ( defined $params{dir} );
     return bless {
@@ -363,9 +373,14 @@ sub new {
         error_code          => 0,
         verbose             => $params{verbose},
         no_encryption       => $params{no_encryption},
-        upgrade_metadata_to => $params{upgrade_metadata_to}
+        upgrade_metadata_to => $params{upgrade_metadata_to},
     };
 
+}
+
+sub diff {
+  my $self = shift;
+    return $self->{diff};
 }
 
 sub error_code {
@@ -395,20 +410,21 @@ sub init {
         return 0;
     }
 
-    my $userkey = Rdiffpkoe::Userkey->new(
+    my $userkey = Rdiffopke::Userkey->new(
         dir     => $self->dir,
         verbose => $self->verbose
     );
-    my $metadata = Rdiffpkoe::Metadata->new(
+    my $metadata = Rdiffopke::Metadata->new(
         dir     => $self->dir,
         verbose => $self->verbose
     );
 
-   #      if (! $userkey->exists && !$self->no_encryption && <$self->{dir}/*>) {
+    $DB::single=1;
+  #  if (! $userkey->exists && !$self->no_encryption && </Users/alex/tmp/rdiffopke/*> ) {
+    if (! $userkey->exists && !$self->no_encryption && (<${self->dir}/*>) ) {
     $self->error_code(3);
     return 0;
-
-    #     }
+    }
 
     if ( !$userkey->init ) {
         $self->error_code( $userkey->error_code );
@@ -444,7 +460,19 @@ sub init {
     $self->{userkey}  = $userkey;
     
    
+    
     return 1;    # Returns true;
+}
+
+
+sub dir {
+    my $self = shift;
+    return $self->{dir};
+}
+
+sub verbose {
+    my $self = shift;
+    return $self->{verbose};
 }
 
 sub metadata {
@@ -457,7 +485,11 @@ sub close {
     $self->metadata->close;
 }
 
-    
+sub filename {
+      my $self = shift;
+    return $self->{filename};
+}
+ 
 sub schema_version {
     my $self = shift;
     return $self->metadata->schema_version;
@@ -466,7 +498,8 @@ sub schema_version {
 
 sub set_message {
     my ( $self, $message ) = @_;
-    $self->metadata->set_message($message);
+     $DB::single = 1;
+    $self->metadata->set_message($message) if ($self->metadata);
 }
 
 
@@ -479,23 +512,24 @@ sub set_message {
 package Rdiffopke::Userkey;
 
 sub new {
+	my $class = shift;
     my %params = @_;
     return unless ( defined $params{dir} );
     return bless {
         dir        => $params{dir},
         error_code => 0,
         verbose    => $params{verbose},
-        keyfile    => "$params{dir}/pubkey"
+        filename    => "$params{dir}/pubkey",
     };
 
 }
 
 sub exists {
     my $self = shift;
-    ( -e $self->keyfile ) ? 1 : 0;
+    ( -e $self->filename ) ? 1 : 0;
 }
 
-sub keyfile {
+sub filename {
     my $self = shift;
-    return $self->{keyfile};
+    return $self->{filename};
 }
