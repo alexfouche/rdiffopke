@@ -4,6 +4,36 @@ use strict;
 sub verbose_message($);
 sub subscribe_to_signals;
 
+
+package Rdiffopke;
+  use base qw(Class::Accessor::Fast );
+      Rdiffopke->mk_accessors (qw( repository no_encryption source rdiff_dir verbose ));
+    Rdiffopke->mk_ro_accessors (qw( version need_metadata_schema_version ));
+
+
+	package Rdiffopke::Metadata;
+
+
+	  use base qw(Class::Accessor::Fast );
+	      Rdiffopke::Metadata->mk_accessors qw( error_code );
+	    Rdiffopke::Metadata->mk_ro_accessors qw( diff _dbh schema_version _verbose _filename);
+
+		package Rdiffopke::Repository;
+
+		  use base qw(Class::Accessor::Fast );
+		      Rdiffopke::Repository->mk_accessors qw( error_code );
+		    Rdiffopke::Repository->mk_ro_accessors qw( diff _dir _verbose _no_encryption metadata userkey);
+
+
+			package Rdiffopke::Userkey;
+
+			  use base qw(Class::Accessor::Fast );
+			      Rdiffopke::Userkey->mk_ro_accessors qw( _filename );
+
+
+package main;
+
+
 # Check if required Perl modules are installed and import them
 Rdiffopke->import_required_modules;
 
@@ -12,8 +42,8 @@ subscribe_to_signals $rdiffopke;
 
 $rdiffopke->get_params_and_input;
 $rdiffopke->init_repository;
-$rdiffopke->check_source;
-$rdiffopke->proceed;
+#$rdiffopke->check_source;
+#$rdiffopke->proceed;
 $rdiffopke->terminate;
 
 # We should never get there
@@ -44,11 +74,6 @@ sub verbose_message($) {
 ###############################
 
 package Rdiffopke;
-
-
-  use base qw(Class::Accessor::Fast );
-      Rdiffopke->mk_accessors (qw( repository no_encryption source rdiff_dir verbose ));
-    Rdiffopke->mk_ro_accessors (qw( version need_metadata_schema_version ));
 
 
 sub import_required_modules {
@@ -198,12 +223,6 @@ Source only support local directory or ftp:// at this time",
 
 package Rdiffopke::Metadata;
 
-
-  use base qw(Class::Accessor::Fast );
-      Rdiffopke::Metadata->mk_accessors qw( error_code );
-    Rdiffopke::Metadata->mk_ro_accessors qw( diff _dbh schema_version );
-
-
 sub new {
     my $class  = shift;
     my %params = @_;
@@ -221,7 +240,7 @@ sub init {
     my $self   = shift;
     my %params = @_;
 
-    if ( -e $self->filename ) {
+    if ( -e $self->_filename ) {
 
         unless ( $self->_connect ) {
             return 0;    # $self->error_code is already set
@@ -244,26 +263,25 @@ sub init {
             return 0;
         }
 
-        $self->_upgrade_schema( $params{upgrade_metadata_to} )
+        $self->_upgrade_schema_to( $params{upgrade_metadata_to} )
           if ( $self->schema_version < $params{upgrade_metadata_to} );
 
     }
     else {
-        unless ( $self->connect ) {
+        unless ( $self->_connect ) {
             return 0;    # $self->error_code is already set
         }
-        schema_version ( 0);
+        $self->{schema_version} = 0;
     }
 
-    $self->_upgrade_schema( $params{upgrade_metadata_to} );
-
+ 
     local $self->_dbh->{PrintError} = 0;
 
     $self->_dbh->do("PRAGMA foreign_keys = ON");
     $self->_dbh->do("PRAGMA default_synchronous = OFF");
 
-    if ( $params{upgrade_to} && $self->schema_version < $params{upgrade_to} ) {
-        unless ( $self->_upgrade_schema_to( $params{upgrade_to} ) ) {
+    if ($params{upgrade_metadata_to} && $self->schema_version < $params{upgrade_metadata_to} ) {
+        unless ( $self->_upgrade_schema_to( $params{upgrade_metadata_to}) ) {
             return 0;    # $self->error_code is already set
         }
 
@@ -272,28 +290,41 @@ sub init {
     return 1;            # Returns true
 }
 
+sub close{
+	 my $self = shift;
+	$self->_disconnect;
+	$self->error_code(0);
+}
+
 sub _connect {
     my $self = shift;
 
-    my $dbh = DBI->connect( "dbi:SQLite:dbname=${self->filename}", "", "" );
+    my $dbh = DBI->connect( "dbi:SQLite:dbname=$self->_filename", "", "" );
     unless ( defined $dbh ) {
         $self->error_code(6);
         return 0;
     }
 
-    $self->_dbh ( $dbh);
+    $self->{_dbh}=  $dbh;
     return 1;    # Returns true
 }
 
 sub _disconnect {
     my $self = shift;
 
-    $self->_dbh->close;
+    $self->_dbh->disconnect;
+$self->{_dbh} = undef;
     return 1;    # Returns true
 }
 
 
-sub _upgrade_schema {
+sub exists {
+    my $self = shift;
+    ( -e $self->_filename ) ? 1 : 0;
+}
+
+
+sub _upgrade_schema_to {
     my $self       = shift;
     my $upgrade_to = shift;
 
@@ -362,10 +393,6 @@ sub set_message {
 
 package Rdiffopke::Repository;
 
-  use base qw(Class::Accessor::Fast );
-      Rdiffopke::Repository->mk_accessors qw( error_code );
-    Rdiffopke::Repository->mk_ro_accessors qw( diff _dir _verbose _no_encryption metadata userkey);
-
 
 sub new {
     my $class = shift;
@@ -414,7 +441,7 @@ sub init {
         verbose => $self->_verbose
     );
 
-    $DB::single = 1;
+    
 
 #  if (! $userkey->exists && !$self->_no_encryption && </Users/alex/tmp/rdiffopke/*> ) {
     my $tmp = $self->_dir;
@@ -423,17 +450,14 @@ sub init {
         return 0;
     }
 
-    if ( !$userkey->init ) {
-        $self->error_code( $userkey->error_code );
-        return 0;
-    }
-
+   
     if ( $self->_no_encryption && -e $userkey->exists ) {
         $self->error_code(4);
         return 0;
     }
 
-    if (   $self->metadata->exists
+ 
+    if (   $metadata->exists
         && !$userkey->exists
         && !$self->_no_encryption )
     {
@@ -443,11 +467,12 @@ sub init {
 
     unless ( $self->_no_encryption ) {
         unless ( $userkey->init ) {
-            $self->error_code(13);
-            return 0;
+                $self->error_code( $userkey->error_code );
+		        return 0;
         }
     }
 
+$DB::single = 1;
     unless ( $metadata->init( upgrade_to => $self->{_upgrade_metadata_to} ) ) {
         $self->error_code( $metadata->error_code );
         return 0;
@@ -483,9 +508,6 @@ sub set_message {
 
 package Rdiffopke::Userkey;
 
-  use base qw(Class::Accessor::Fast );
-      Rdiffopke::Userkey->mk_ro_accessors qw( _filename );
-
 
 sub new {
     my $class  = shift;
@@ -494,7 +516,7 @@ sub new {
     return bless {
         error_code => 0,
         _verbose    => $params{verbose},
-        filename   => "$params{dir}/pubkey",
+        _filename   => "$params{dir}/pubkey",
     };
 
 }
