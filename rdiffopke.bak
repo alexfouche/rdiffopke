@@ -1,5 +1,6 @@
 #!/usr/bin/perl
 
+
 use strict;
 sub verbose_message($);
 sub subscribe_to_signals;
@@ -9,7 +10,7 @@ Rdiffopke->import_required_modules;
 
 my $rdiffopke = Rdiffopke->new;
 subscribe_to_signals $rdiffopke;
-
+    
 $rdiffopke->get_params_and_input;
 $rdiffopke->init_repository;
 $rdiffopke->check_source;
@@ -36,7 +37,6 @@ sub verbose_message($) {
     print localtime(time) . "   $message\n";
 }
 
-
 ###############################
 #
 # Class:  Rdiffopke
@@ -45,14 +45,8 @@ sub verbose_message($) {
 
 package Rdiffopke;
 
-
-  use base qw(Class::Accessor::Fast );
-      Rdiffopke->mk_accessors (qw( repository no_encryption source rdiff_dir verbose ));
-    Rdiffopke->mk_ro_accessors (qw( version need_metadata_schema_version ));
-
-
 sub import_required_modules {
-    my @modules = qw( Class::Accessor Class::Accessor::Fast Getopt::Std DBI DBD::SQLite   );
+    my @modules = qw(  Getopt::Std DBI DBD::SQLite   );
 
     # File::Path::Hashed Path::Class Path::Class::File Path::Class::Dir
     my @messages = ();
@@ -71,7 +65,7 @@ sub import_required_modules {
 }
 
 sub new {
-    return bless {version=>0.1, need_metadata_schema_version=>1, no_encryption=>0};
+    return bless {};
 }
 
 sub get_params_and_input {
@@ -80,14 +74,14 @@ sub get_params_and_input {
 
     getopts( 'vu:p:d:s:ic:x', $getopts ) or quit_error(8);
 
-    $self->verbose        (1) if ( $getopts->{v} );
-    $self->no_encryption  ($getopts->{x});
-    $self->source         ($getopts->{s});
-    $self->rdiff_dir       ($getopts->{d});
+    $self->{verbose}       = 1 if ( $getopts->{v} );
+    $self->{no_encryption} = $getopts->{x};
+    $self->{source}        = $getopts->{s};
+    $self->{repo_dir}      = $getopts->{d};
 
-    unless ( $self->source && $self->rdiff_dir ) {
-        $DB::single = 1;
-        $self->quit_error(8);
+    unless ( $self->{source} && $self->{repo_dir} ) {
+ $DB::single = 1;
+               $self->quit_error(8);
     }
 
 }
@@ -95,25 +89,39 @@ sub get_params_and_input {
 sub init_repository {
     my $self = shift;
 
-    $self->repository ( Rdiffopke::Repository->new(
-        dir                 => $self->rdiff_dir,
-        verbose             => $self->verbose,
-        no_encryption       => $self->no_encryption,
+    $self->{repository} = Rdiffopke::Repository->new(
+        dir                 => $self->{repo_dir},
+        verbose             => $self->{verbose},
+        no_encryption       => $self->{no_encryption},
         upgrade_metadata_to => $self->need_metadata_schema_version
-    ));
-    if ( !$self->repository->init ) {
-        $self->quit_error( $self->repository->error_code );
+    );
+    if ( !$self->{repository}->init ) {
+        $self->quit_error( $self->{repository}->error_code );
     }
 
 }
 
+sub version {
+    my $self = shift;
+    return 0.1;
+}
+
+sub need_metadata_schema_version {
+    my $self = shift;
+    return 1;
+}
+
+sub repository {
+    my $self = shift;
+    return $self->{repository};
+}
+
 sub terminate {
     my ( $self, $code, $message ) = @_;
+     
+    $self->repository->set_message("${code}- $message") if ( defined ($code) && defined ($self->repository));
 
-    $self->repository->set_message("${code}- $message")
-      if ( defined($code) && defined( $self->repository ) );
-
-    $self->repository->close if ( defined $self->repository );
+    $self->repository->close if (  defined $self->repository);
     exit 0;
 }
 
@@ -123,31 +131,16 @@ sub quit_error {
     my %errors = (
         1 => "Some Perl modules are missing for rdiffopke to run.\n",
         2 =>
-          "'$self->rdiff_dir' is neither writable nor browseable -> aborting",
-        3 =>
-"'$self->rdiff_dir' has files inside but is missing the public key file -> aborting",
-
-#        3 =>
-# "'$self->rdiff_dir' has files inside but is missing the public key file '${self->repository->userkey->filename}' -> aborting",
+        "'$self->{repo_dir}' is neither writable nor browseable -> aborting",
+        3 =>    "'$self->{repo_dir}' has files inside but is missing the public key file '${self->repository->userkey->filename}' -> aborting",
         4 =>
-"You have requested no encryption but there is a public key file -> aborting",
-
-#        4 =>
-# "You have requested no encryption but there is a public key file '${self->repository->userkey->filename}' -> aborting",
+        "You have requested no encryption but there is a public key file '${self->repository->userkey->filename}' -> aborting",
         5 =>
-"There is a metadata file  but the public key file is missing ! Set to 'no encryption' if you never used it there -> aborting",
-
-#        5 =>
-#"There is a metadata file '$self->repository->metadata->filename' but the public key file '${self->repository->userkey->filename}' is missing ! Set to 'no encryption' if you never used it there -> aborting",
+        "There is a metadata file '$self->repository->metadata->filename' but the public key file '${self->repository->userkey->filename}' is missing ! Set to 'no encryption' if you never used it there -> aborting",
         6 =>
-"Metadata file seems to be corrupted. It should #be a SQLite database -> aborting",
-
-#        6 =>
-# "Metadata file '${self->repository->metadata->filename}' seems to be corrupted. It should #be a SQLite database -> aborting",
-        7 => "An error occurred while initializing metadata file -> aborting",
-
-#        7 =>
-#"An error occurred while initializing metadata '${self->repository->metadata->filename}' file -> aborting",
+        "Metadata file '${self->repository->metadata->filename}' seems to be corrupted. It should be a SQLite database -> aborting",
+        7 =>
+        "An error occurred while initializing metadata '${self->repository->metadata->filename}' file -> aborting",
         8 =>
 "Usage: $0 [-v] [-u <username>] [-p <password>] [-x] [-c <credentials_file>] [-i] -s <source> -d <local_destination_dir>
 
@@ -169,19 +162,17 @@ il faudrait une option pour tout verifier
 
 Note:
 Source only support local directory or ftp:// at this time",
-        9 => "Could not read metadata version from metadata file -> aborting",
-
-#        9 =>
-# "Could not read metadata version from metadata file '$self->repository->metadata->filename' -> aborting",
+        9 =>
+        "Could not read metadata version from metadata file '{$self->repository->metadata->filename}' -> aborting",
         10 => "Killed (SIGTERM)",
         11 => "Aborted by user (SIGINT)",
-        12 => "The local rdiff '$self->rdiff_dir' is not a directory",
+        12 => "The local rdiff '$self->{repo_dir}' is not a directory",
         13 => "An error occurred during user key creation",
         14 => "An error occurred while upgrading metadata schema",
 
     );
 
-    $DB::single = 1;
+    $DB::single=1;
     print STDERR localtime(time) . "   $errors{$error_code}\n";
     foreach (@messages) {
         print STDERR localtime(time) . "   $_\n";
@@ -198,21 +189,15 @@ Source only support local directory or ftp:// at this time",
 
 package Rdiffopke::Metadata;
 
-
-  use base qw(Class::Accessor::Fast );
-      Rdiffopke::Metadata->mk_accessors qw( error_code );
-    Rdiffopke::Metadata->mk_ro_accessors qw( diff _dbh schema_version );
-
-
 sub new {
-    my $class  = shift;
+	my $class = shift;
     my %params = @_;
     $DB::single = 1;
     return unless ( defined $params{dir} );
     return bless {
+        dir        => $params{dir},
         error_code => 0,
-        _verbose    => $params{verbose},
-        _filename   => "$params{dir}/metadata"
+        verbose    => $params{verbose},  filename    => "$params{dir}/metadata"
     };
 
 }
@@ -223,7 +208,7 @@ sub init {
 
     if ( -e $self->filename ) {
 
-        unless ( $self->_connect ) {
+        unless ( $self->connect ) {
             return 0;    # $self->error_code is already set
         }
 
@@ -231,14 +216,15 @@ sub init {
             local $self->_dbh->{RaiseError} = 1;
             local $self->_dbh->{PrintError} = 0;
             $DB::single = 1;
-            $self->schema_version ( $self->_dbh->selectrow_array( 'select value from options where name = "metadata_version";'));
+            $self->{schema_version} = $self->_dbh->selectrow_array(
+                'select value from options where name = "metadata_version";');
         };
         if ($@) {
             $self->error_code(9);
             return 0;
         }
-        unless ( defined( $self->schema_version )
-            && $self->schema_version > 0 )
+        unless ( defined( $self->{schema_version} )
+            && $self->{schema_version} > 0 )
         {
             $self->error_code(9);
             return 0;
@@ -252,7 +238,7 @@ sub init {
         unless ( $self->connect ) {
             return 0;    # $self->error_code is already set
         }
-        schema_version ( 0);
+        $self->{schema_version} = 0;
     }
 
     $self->_upgrade_schema( $params{upgrade_metadata_to} );
@@ -268,8 +254,8 @@ sub init {
         }
 
     }
-
-    return 1;            # Returns true
+        
+     return 1;        # Returns true
 }
 
 sub _connect {
@@ -281,7 +267,7 @@ sub _connect {
         return 0;
     }
 
-    $self->_dbh ( $dbh);
+    $self->{dbh} = $dbh;
     return 1;    # Returns true
 }
 
@@ -292,6 +278,10 @@ sub _disconnect {
     return 1;    # Returns true
 }
 
+sub schema_version {
+    my $self = shift;
+    return $self->{schema_version};
+}
 
 sub _upgrade_schema {
     my $self       = shift;
@@ -309,7 +299,7 @@ sub _upgrade_schema {
     );
 
     verbose_message("Metadata schema needs upgrade, do not interrupt...")
-      if ( $self->_verbose );
+      if ( $self->{verbose} );
 
     for ( my $i = $self->schema_version + 1 ; $i <= $upgrade_to ; $i++ ) {
 
@@ -338,20 +328,31 @@ sub _upgrade_schema {
     }
 
     verbose_message("Finished upgrade of metadata schema")
-      if ( $self->_verbose );
+      if ( $self->{verbose} );
 
     return 1;    # Returns true
+}
+
+sub _dbh {
+    my $self = shift;
+    return $self->{dbh};
 }
 
 
 sub set_message {
     my ( $self, $message ) = @_;
+    
+     $DB::single = 1;
+               $self->_dbh->do(
+               "update diffs set message = $message where diff = ${self->diff};"            ) if ($self->diff);
 
-    $DB::single = 1;
-    $self->_dbh->do(
-        "update diffs set message = $message where diff = ${self->diff};")
-      if ( $self->diff );
 
+}
+
+
+sub diff {
+  my $self = shift;
+    return $self->{diff};
 }
 
 ###############################
@@ -362,65 +363,71 @@ sub set_message {
 
 package Rdiffopke::Repository;
 
-  use base qw(Class::Accessor::Fast );
-      Rdiffopke::Repository->mk_accessors qw( error_code );
-    Rdiffopke::Repository->mk_ro_accessors qw( diff _dir _verbose _no_encryption metadata userkey);
-
-
 sub new {
-    my $class = shift;
-    $DB::single = 1;
+		my $class = shift;
+	$DB::single = 1;
     my %params = @_;
     return unless ( defined $params{dir} );
     return bless {
-        _dir                 => $params{dir},
+        dir                 => $params{dir},
         error_code          => 0,
-        _verbose             => $params{verbose},
-        _no_encryption       => $params{no_encryption},
-        _upgrade_metadata_to => $params{upgrade_metadata_to},
+        verbose             => $params{verbose},
+        no_encryption       => $params{no_encryption},
+        upgrade_metadata_to => $params{upgrade_metadata_to},
     };
 
 }
 
+sub diff {
+  my $self = shift;
+    return $self->{diff};
+}
+
+sub error_code {
+    my $self = shift;
+    
+    $self->{error_code} = $_[0] if ( defined $_[0]);
+    
+    return $self->{error_code};
+}
 
 sub init {
     my $self = shift;
 
-    if ( -e $self->_dir && !-d $self->_dir ) {
+    if ( -e $self->{dir} && !-d $self->{dir} ) {
         $self->error(12);
         return 0;
 
     }
     else {
-        verbose_message("Creating local reverse-diffs directory '$self->_dir'")
-          if ( $self->_verbose );
-        mkdir $self->_dir;
+        verbose_message("Creating local reverse-diffs directory '$self->{dir}'")
+          if ( $self->{verbose} );
+        mkdir $self->{dir};
     }
 
-    unless ( -d $self->_dir
-        && -x $self->_dir
-        && -w $self->_dir )
+    unless ( -d $self->{dir}
+        && -x $self->{dir}
+        && -w $self->{dir} )
     {
         $self->error_code(2);
         return 0;
     }
 
     my $userkey = Rdiffopke::Userkey->new(
-        dir     => $self->_dir,
-        verbose => $self->_verbose
+        dir     => $self->dir,
+        verbose => $self->verbose
     );
     my $metadata = Rdiffopke::Metadata->new(
-        dir     => $self->_dir,
-        verbose => $self->_verbose
+        dir     => $self->dir,
+        verbose => $self->verbose
     );
 
-    $DB::single = 1;
-
-#  if (! $userkey->exists && !$self->_no_encryption && </Users/alex/tmp/rdiffopke/*> ) {
-    my $tmp = $self->_dir;
-    if ( !$userkey->exists && !$self->_no_encryption && <$tmp/*> ) {
-        $self->error_code(3);
-        return 0;
+    $DB::single=1;
+  #  if (! $userkey->exists && !$self->no_encryption && </Users/alex/tmp/rdiffopke/*> ) {
+my $tmp = $self->dir ;
+    if (! $userkey->exists && !$self->no_encryption && <$tmp/*> ) {
+    $self->error_code(3);
+    return 0;
     }
 
     if ( !$userkey->init ) {
@@ -428,52 +435,87 @@ sub init {
         return 0;
     }
 
-    if ( $self->_no_encryption && -e $userkey->exists ) {
+    if ( $self->no_encryption && -e $userkey->exists ) {
         $self->error_code(4);
         return 0;
     }
 
     if (   $self->metadata->exists
         && !$userkey->exists
-        && !$self->_no_encryption )
+        && !$self->no_encryption )
     {
         $self->error_code(5);
         return 0;
     }
 
-    unless ( $self->_no_encryption ) {
+    unless ( $self->no_encryption ) {
         unless ( $userkey->init ) {
             $self->error_code(13);
             return 0;
         }
     }
 
-    unless ( $metadata->init( upgrade_to => $self->{_upgrade_metadata_to} ) ) {
+    unless ( $metadata->init( upgrade_to => $self->{upgrade_metadata_to} ) ) {
         $self->error_code( $metadata->error_code );
         return 0;
     }
 
     $self->{metadata} = $metadata;
     $self->{userkey}  = $userkey;
-
+    
+   
+    
     return 1;    # Returns true;
+}
+
+
+sub dir {
+    my $self = shift;
+    return $self->{dir};
+}
+
+sub no_encryption {
+    my $self = shift;
+    return $self->{no_encryption};
+}
+
+sub verbose {
+    my $self = shift;
+    return $self->{verbose};
+}
+
+sub metadata {
+    my $self = shift;
+    return $self->{metadata};
+}
+
+sub userkey {
+    my $self = shift;
+    return $self->{userkey};
 }
 
 sub close {
     my $self = shift;
-    $self->metadata->close if ( defined $self->metadata );
+    $self->metadata->close;
 }
 
+sub filename {
+      my $self = shift;
+    return $self->{filename};
+}
+ 
 sub schema_version {
     my $self = shift;
     return $self->metadata->schema_version;
 }
 
+
 sub set_message {
     my ( $self, $message ) = @_;
-    $DB::single = 1;
-    $self->metadata->set_message($message) if ( $self->metadata );
+     $DB::single = 1;
+    $self->metadata->set_message($message) if ($self->metadata);
 }
+
 
 ###############################
 #
@@ -483,17 +525,14 @@ sub set_message {
 
 package Rdiffopke::Userkey;
 
-  use base qw(Class::Accessor::Fast );
-      Rdiffopke::Userkey->mk_ro_accessors qw( _filename );
-
-
 sub new {
-    my $class  = shift;
+	my $class = shift;
     my %params = @_;
     return unless ( defined $params{dir} );
     return bless {
+        dir        => $params{dir},
         error_code => 0,
-        _verbose    => $params{verbose},
+        verbose    => $params{verbose},
         filename   => "$params{dir}/pubkey",
     };
 
@@ -501,5 +540,10 @@ sub new {
 
 sub exists {
     my $self = shift;
-    ( -e $self->_filename ) ? 1 : 0;
+    ( -e $self->filename ) ? 1 : 0;
+}
+
+sub filename {
+    my $self = shift;
+    return $self->{filename};
 }
