@@ -4,35 +4,43 @@ use strict;
 sub verbose_message($);
 sub subscribe_to_signals;
 
-
 package Rdiffopke;
-  use base qw(Class::Accessor::Fast );
-      Rdiffopke->mk_accessors (qw( repository no_encryption source rdiff_dir verbose ));
-    Rdiffopke->mk_ro_accessors (qw( version need_metadata_schema_version ));
+use base qw(Class::Accessor::Fast );
+Rdiffopke->mk_accessors(
+    qw( repository no_encryption source rdiff_dir verbose ));
+Rdiffopke->mk_ro_accessors(qw( version need_metadata_schema_version ));
 
+package Rdiffopke::Metadata;
 
-	package Rdiffopke::Metadata;
+use base qw(Class::Accessor::Fast );
+Rdiffopke::Metadata->mk_accessors qw( error_code );
+Rdiffopke::Metadata->mk_ro_accessors
+  qw( diff _dbh schema_version _verbose _filename);
 
+package Rdiffopke::Filesource;
 
-	  use base qw(Class::Accessor::Fast );
-	      Rdiffopke::Metadata->mk_accessors qw( error_code );
-	    Rdiffopke::Metadata->mk_ro_accessors qw( diff _dbh schema_version _verbose _filename);
+use base qw(Class::Accessor::Fast );
+Rdiffopke::Filesource->mk_accessors qw( error_code );
+Rdiffopke::Filesource->mk_ro_accessors qw(  _verbose );
 
-		package Rdiffopke::Repository;
+package Rdiffopke::Filesource::_Localdir;
 
-		  use base qw(Class::Accessor::Fast );
-		      Rdiffopke::Repository->mk_accessors qw( error_code );
-		    Rdiffopke::Repository->mk_ro_accessors qw( diff _dir _verbose _no_encryption metadata userkey);
+use base qw( Rdiffopke::Filesource Class::Accessor::Fast );
+Rdiffopke::Filesource::_Localdir->mk_ro_accessors qw(  _dir);
 
+package Rdiffopke::Repository;
 
-			package Rdiffopke::Userkey;
+use base qw(Class::Accessor::Fast );
+Rdiffopke::Repository->mk_accessors qw( error_code );
+Rdiffopke::Repository->mk_ro_accessors
+  qw( diff _dir _verbose _no_encryption metadata userkey);
 
-			  use base qw(Class::Accessor::Fast );
-			      Rdiffopke::Userkey->mk_ro_accessors qw( _filename );
+package Rdiffopke::Userkey;
 
+use base qw(Class::Accessor::Fast );
+Rdiffopke::Userkey->mk_ro_accessors qw( _filename );
 
 package main;
-
 
 # Check if required Perl modules are installed and import them
 Rdiffopke->import_required_modules;
@@ -42,6 +50,7 @@ subscribe_to_signals $rdiffopke;
 
 $rdiffopke->get_params_and_input;
 $rdiffopke->init_repository;
+
 #$rdiffopke->check_source;
 #$rdiffopke->proceed;
 $rdiffopke->terminate;
@@ -66,7 +75,6 @@ sub verbose_message($) {
     print localtime(time) . "   $message\n";
 }
 
-
 ###############################
 #
 # Class:  Rdiffopke
@@ -75,9 +83,9 @@ sub verbose_message($) {
 
 package Rdiffopke;
 
-
 sub import_required_modules {
-    my @modules = qw( Class::Accessor Class::Accessor::Fast Getopt::Std DBI DBD::SQLite   );
+    my @modules =
+      qw( Class::Accessor Class::Accessor::Fast Getopt::Std DBI DBD::SQLite   );
 
     # File::Path::Hashed Path::Class Path::Class::File Path::Class::Dir
     my @messages = ();
@@ -96,7 +104,11 @@ sub import_required_modules {
 }
 
 sub new {
-    return bless {version=>0.1, need_metadata_schema_version=>1, no_encryption=>0};
+    return bless {
+        version                      => 0.1,
+        need_metadata_schema_version => 1,
+        no_encryption                => 0
+    };
 }
 
 sub get_params_and_input {
@@ -105,10 +117,10 @@ sub get_params_and_input {
 
     getopts( 'vu:p:d:s:ic:x', $getopts ) or quit_error(8);
 
-    $self->verbose        (1) if ( $getopts->{v} );
-    $self->no_encryption  ($getopts->{x});
-    $self->source         ($getopts->{s});
-    $self->rdiff_dir       ($getopts->{d});
+    $self->verbose(1) if ( $getopts->{v} );
+    $self->no_encryption( $getopts->{x} );
+    $self->source( $getopts->{s} );
+    $self->rdiff_dir( $getopts->{d} );
 
     unless ( $self->source && $self->rdiff_dir ) {
         $DB::single = 1;
@@ -120,12 +132,14 @@ sub get_params_and_input {
 sub init_repository {
     my $self = shift;
 
-    $self->repository ( Rdiffopke::Repository->new(
-        dir                 => $self->rdiff_dir,
-        verbose             => $self->verbose,
-        no_encryption       => $self->no_encryption,
-        upgrade_metadata_to => $self->need_metadata_schema_version
-    ));
+    $self->repository(
+        Rdiffopke::Repository->new(
+            dir                 => $self->rdiff_dir,
+            verbose             => $self->verbose,
+            no_encryption       => $self->no_encryption,
+            upgrade_metadata_to => $self->need_metadata_schema_version
+        )
+    );
     if ( !$self->repository->init ) {
         $self->quit_error( $self->repository->error_code );
     }
@@ -203,6 +217,8 @@ Source only support local directory or ftp:// at this time",
         12 => "The local rdiff '$self->rdiff_dir' is not a directory",
         13 => "An error occurred during user key creation",
         14 => "An error occurred while upgrading metadata schema",
+        15 =>
+"The parameter given to tell_which_files_needed() is not a Rdiffopke::Filelist instance",
 
     );
 
@@ -230,8 +246,8 @@ sub new {
     return unless ( defined $params{dir} );
     return bless {
         error_code => 0,
-        _verbose    => $params{verbose},
-        _filename   => "$params{dir}/metadata"
+        _verbose   => $params{verbose},
+        _filename  => "$params{dir}/metadata"
     };
 
 }
@@ -250,7 +266,11 @@ sub init {
             local $self->_dbh->{RaiseError} = 1;
             local $self->_dbh->{PrintError} = 0;
             $DB::single = 1;
-            $self->schema_version ( $self->_dbh->selectrow_array( 'select value from options where name = "metadata_version";'));
+            $self->schema_version(
+                $self->_dbh->selectrow_array(
+                    'select value from options where name = "metadata_version";'
+                )
+            );
         };
         if ($@) {
             $self->error_code(9);
@@ -274,14 +294,15 @@ sub init {
         $self->{schema_version} = 0;
     }
 
- 
     local $self->_dbh->{PrintError} = 0;
 
     $self->_dbh->do("PRAGMA foreign_keys = ON");
     $self->_dbh->do("PRAGMA default_synchronous = OFF");
 
-    if ($params{upgrade_metadata_to} && $self->schema_version < $params{upgrade_metadata_to} ) {
-        unless ( $self->_upgrade_schema_to( $params{upgrade_metadata_to}) ) {
+    if (   $params{upgrade_metadata_to}
+        && $self->schema_version < $params{upgrade_metadata_to} )
+    {
+        unless ( $self->_upgrade_schema_to( $params{upgrade_metadata_to} ) ) {
             return 0;    # $self->error_code is already set
         }
 
@@ -290,10 +311,10 @@ sub init {
     return 1;            # Returns true
 }
 
-sub close{
-	 my $self = shift;
-	$self->_disconnect;
-	$self->error_code(0);
+sub close {
+    my $self = shift;
+    $self->_disconnect;
+    $self->error_code(0);
 }
 
 sub _connect {
@@ -305,7 +326,7 @@ sub _connect {
         return 0;
     }
 
-    $self->{_dbh}=  $dbh;
+    $self->{_dbh} = $dbh;
     return 1;    # Returns true
 }
 
@@ -313,16 +334,14 @@ sub _disconnect {
     my $self = shift;
 
     $self->_dbh->disconnect;
-$self->{_dbh} = undef;
+    $self->{_dbh} = undef;
     return 1;    # Returns true
 }
-
 
 sub exists {
     my $self = shift;
     ( -e $self->_filename ) ? 1 : 0;
 }
-
 
 sub _upgrade_schema_to {
     my $self       = shift;
@@ -374,7 +393,6 @@ sub _upgrade_schema_to {
     return 1;    # Returns true
 }
 
-
 sub set_message {
     my ( $self, $message ) = @_;
 
@@ -393,7 +411,6 @@ sub set_message {
 
 package Rdiffopke::Repository;
 
-
 sub new {
     my $class = shift;
     $DB::single = 1;
@@ -401,14 +418,13 @@ sub new {
     return unless ( defined $params{dir} );
     return bless {
         _dir                 => $params{dir},
-        error_code          => 0,
+        error_code           => 0,
         _verbose             => $params{verbose},
         _no_encryption       => $params{no_encryption},
         _upgrade_metadata_to => $params{upgrade_metadata_to},
     };
 
 }
-
 
 sub init {
     my $self = shift;
@@ -441,8 +457,6 @@ sub init {
         verbose => $self->_verbose
     );
 
-    
-
 #  if (! $userkey->exists && !$self->_no_encryption && </Users/alex/tmp/rdiffopke/*> ) {
     my $tmp = $self->_dir;
     if ( !$userkey->exists && !$self->_no_encryption && <$tmp/*> ) {
@@ -450,13 +464,11 @@ sub init {
         return 0;
     }
 
-   
     if ( $self->_no_encryption && -e $userkey->exists ) {
         $self->error_code(4);
         return 0;
     }
 
- 
     if (   $metadata->exists
         && !$userkey->exists
         && !$self->_no_encryption )
@@ -467,12 +479,12 @@ sub init {
 
     unless ( $self->_no_encryption ) {
         unless ( $userkey->init ) {
-                $self->error_code( $userkey->error_code );
-		        return 0;
+            $self->error_code( $userkey->error_code );
+            return 0;
         }
     }
 
-$DB::single = 1;
+    $DB::single = 1;
     unless ( $metadata->init( upgrade_to => $self->{_upgrade_metadata_to} ) ) {
         $self->error_code( $metadata->error_code );
         return 0;
@@ -500,6 +512,113 @@ sub set_message {
     $self->metadata->set_message($message) if ( $self->metadata );
 }
 
+sub tell_which_files_needed {
+    my $self            = shift;
+    my $source_filelist = shift
+
+      if (!defined $source_filelist
+        || ref($source_filelist) ne 'Rdiffopke::Filelist' )
+    {
+        $self->error_code() return undef;
+    }
+
+    my $need_filelist = Rdiffopke::Filelist->new();
+
+# TODO : Do file list compare with repository content and fill $need_filelist with items to be refreshed
+
+    return $need_filelist;
+}
+
+
+###############################
+#
+# Class:  Rdiffopke::Filesource
+#
+###############################
+
+package Rdiffopke::Filesource;
+
+# Rdiffopke::Filesource->new gets an URL and return an initialized object of a relevant derived class, depending of URL parameter
+sub new {
+    my $class  = shift;
+    my %params = @_;
+    return unless ( defined $params{url} );
+
+    #   case $url
+    #match ^ftp://
+
+    return Rdiffopke::Filesource::_Localdir->new( dir = $params{url},
+        verbose => $params{verbose} );
+    return bless {
+        error_code => 0,
+        _verbose   => $params{verbose},
+    };
+
+}
+
+sub prepare {
+    return 1;    # return true
+}
+
+sub get_file_list {
+    return ();
+}
+
+
+###############################
+#
+# Class:  Rdiffopke::Filesource::_Localdir
+#
+###############################
+
+package Rdiffopke::Filesource::_Localdir;
+
+sub new {
+    my $class  = shift;
+    my %params = @_;
+    return unless ( defined $params{dir} );
+
+    return bless {
+        error_code => 0,
+        _verbose   => $params{verbose},
+        _dir       => $params{dir},
+    };
+}
+
+sub prepare {
+    my $self = shift;
+    return 1;    # return true
+}
+
+sub get_detailed_file_list {
+    my $self = shift;
+
+    my $filelist = $Rdiffopke::Filelist->new;
+
+    # Fill filelist there
+
+    return $filelist;
+}
+
+
+###############################
+#
+# Class:  Rdiffopke::Filelist
+#
+###############################
+
+package Rdiffopke::Filelist;
+
+sub new {
+    return bless [];
+}
+
+sub add {
+    my $self = shift;
+
+}
+
+
 ###############################
 #
 # Class:  Rdiffopke::Userkey
@@ -508,15 +627,14 @@ sub set_message {
 
 package Rdiffopke::Userkey;
 
-
 sub new {
     my $class  = shift;
     my %params = @_;
     return unless ( defined $params{dir} );
     return bless {
         error_code => 0,
-        _verbose    => $params{verbose},
-        _filename   => "$params{dir}/pubkey",
+        _verbose   => $params{verbose},
+        _filename  => "$params{dir}/pubkey",
     };
 
 }
@@ -525,3 +643,4 @@ sub exists {
     my $self = shift;
     ( -e $self->_filename ) ? 1 : 0;
 }
+
