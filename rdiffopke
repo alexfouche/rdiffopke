@@ -1,6 +1,5 @@
 #!/usr/bin/perl
 
-
 use strict;
 sub verbose_message($);
 sub subscribe_to_signals;
@@ -10,7 +9,7 @@ Rdiffopke->import_required_modules;
 
 my $rdiffopke = Rdiffopke->new;
 subscribe_to_signals $rdiffopke;
-    
+
 $rdiffopke->get_params_and_input;
 $rdiffopke->init_repository;
 $rdiffopke->check_source;
@@ -80,8 +79,8 @@ sub get_params_and_input {
     $self->{repo_dir}      = $getopts->{d};
 
     unless ( $self->{source} && $self->{repo_dir} ) {
- $DB::single = 1;
-               $self->quit_error(8);
+        $DB::single = 1;
+        $self->quit_error(8);
     }
 
 }
@@ -118,10 +117,11 @@ sub repository {
 
 sub terminate {
     my ( $self, $code, $message ) = @_;
-     
-    $self->repository->set_message("${code}- $message") if ( defined ($code) && defined ($self->repository));
 
-    $self->repository->close if (  defined ($self->repository));
+    $self->repository->set_message("${code}- $message")
+      if ( defined($code) && defined( $self->repository ) );
+
+    $self->repository->close if ( defined $self->repository );
     exit 0;
 }
 
@@ -133,15 +133,25 @@ sub quit_error {
         2 =>
           "'$self->{repo_dir}' is neither writable nor browseable -> aborting",
         3 =>
-"'$self->{repo_dir}' has files inside but is missing the public key file '$self->userkey->filename' -> aborting",
+ "'$self->{repo_dir}' has files inside but is missing the public key file -> aborting",
+#        3 =>
+# "'$self->{repo_dir}' has files inside but is missing the public key file '${self->repository->userkey->filename}' -> aborting",
         4 =>
-"You have requested no encryption but there is a public key file '$self->userkey->filename' -> aborting",
+"You have requested no encryption but there is a public key file -> aborting",
+#        4 =>
+# "You have requested no encryption but there is a public key file '${self->repository->userkey->filename}' -> aborting",
         5 =>
-"There is a metadata file '$self->metadata->filename' but the public key file '$self->userkey->filename' is missing ! Set to 'no encryption' if you never used it there -> aborting",
+"There is a metadata file  but the public key file is missing ! Set to 'no encryption' if you never used it there -> aborting",
+#        5 =>
+#"There is a metadata file '$self->repository->metadata->filename' but the public key file '${self->repository->userkey->filename}' is missing ! Set to 'no encryption' if you never used it there -> aborting",
         6 =>
-"Metadata file '$self->metadata->filename' seems to be corrupted. It should be a SQLite database -> aborting",
+ "Metadata file seems to be corrupted. It should #be a SQLite database -> aborting",
+#        6 =>
+# "Metadata file '${self->repository->metadata->filename}' seems to be corrupted. It should #be a SQLite database -> aborting",
         7 =>
-"An error occurred while initializing metadata '$self->metadata->filename' file -> aborting",
+"An error occurred while initializing metadata file -> aborting",
+#        7 =>
+#"An error occurred while initializing metadata '${self->repository->metadata->filename}' file -> aborting",
         8 =>
 "Usage: $0 [-v] [-u <username>] [-p <password>] [-x] [-c <credentials_file>] [-i] -s <source> -d <local_destination_dir>
 
@@ -164,7 +174,9 @@ il faudrait une option pour tout verifier
 Note:
 Source only support local directory or ftp:// at this time",
         9 =>
-"Could not read metadata version from metadata file '$self->metadata->filename' -> aborting",
+"Could not read metadata version from metadata file -> aborting",
+#        9 =>
+# "Could not read metadata version from metadata file '$self->repository->metadata->filename' -> aborting",
         10 => "Killed (SIGTERM)",
         11 => "Aborted by user (SIGINT)",
         12 => "The local rdiff '$self->{repo_dir}' is not a directory",
@@ -173,6 +185,7 @@ Source only support local directory or ftp:// at this time",
 
     );
 
+    $DB::single = 1;
     print STDERR localtime(time) . "   $errors{$error_code}\n";
     foreach (@messages) {
         print STDERR localtime(time) . "   $_\n";
@@ -190,14 +203,15 @@ Source only support local directory or ftp:// at this time",
 package Rdiffopke::Metadata;
 
 sub new {
-	my $class = shift;
+    my $class  = shift;
     my %params = @_;
     $DB::single = 1;
     return unless ( defined $params{dir} );
     return bless {
         dir        => $params{dir},
         error_code => 0,
-        verbose    => $params{verbose},  filename    => "$params{dir}/metadata"
+        verbose    => $params{verbose},
+        filename   => "$params{dir}/metadata"
     };
 
 }
@@ -254,8 +268,8 @@ sub init {
         }
 
     }
-        
-     return 1;        # Returns true
+
+    return 1;            # Returns true
 }
 
 sub _connect {
@@ -338,20 +352,18 @@ sub _dbh {
     return $self->{dbh};
 }
 
-
 sub set_message {
     my ( $self, $message ) = @_;
-    
-     $DB::single = 1;
-               $self->_dbh->do(
-               "update diffs set message = $message where diff = ${self->diff};"            ) if ($self->diff);
 
+    $DB::single = 1;
+    $self->_dbh->do(
+        "update diffs set message = $message where diff = ${self->diff};")
+      if ( $self->diff );
 
 }
 
-
 sub diff {
-  my $self = shift;
+    my $self = shift;
     return $self->{diff};
 }
 
@@ -364,8 +376,8 @@ sub diff {
 package Rdiffopke::Repository;
 
 sub new {
-		my $class = shift;
-	$DB::single = 1;
+    my $class = shift;
+    $DB::single = 1;
     my %params = @_;
     return unless ( defined $params{dir} );
     return bless {
@@ -379,12 +391,15 @@ sub new {
 }
 
 sub diff {
-  my $self = shift;
+    my $self = shift;
     return $self->{diff};
 }
 
 sub error_code {
     my $self = shift;
+
+    $self->{error_code} = $_[0] if ( defined $_[0] );
+
     return $self->{error_code};
 }
 
@@ -419,11 +434,13 @@ sub init {
         verbose => $self->verbose
     );
 
-    $DB::single=1;
-  #  if (! $userkey->exists && !$self->no_encryption && </Users/alex/tmp/rdiffopke/*> ) {
-    if (! $userkey->exists && !$self->no_encryption && (<${self->dir}/*>) ) {
-    $self->error_code(3);
-    return 0;
+    $DB::single = 1;
+
+#  if (! $userkey->exists && !$self->no_encryption && </Users/alex/tmp/rdiffopke/*> ) {
+    my $tmp = $self->dir;
+    if ( !$userkey->exists && !$self->no_encryption && <$tmp/*> ) {
+        $self->error_code(3);
+        return 0;
     }
 
     if ( !$userkey->init ) {
@@ -458,16 +475,18 @@ sub init {
 
     $self->{metadata} = $metadata;
     $self->{userkey}  = $userkey;
-    
-   
-    
+
     return 1;    # Returns true;
 }
-
 
 sub dir {
     my $self = shift;
     return $self->{dir};
+}
+
+sub no_encryption {
+    my $self = shift;
+    return $self->{no_encryption};
 }
 
 sub verbose {
@@ -480,28 +499,31 @@ sub metadata {
     return $self->{metadata};
 }
 
+sub userkey {
+    my $self = shift;
+    return $self->{userkey};
+}
+
 sub close {
     my $self = shift;
-    $self->metadata->close;
+    $self->metadata->close if (defined $self->metadata);
 }
 
 sub filename {
-      my $self = shift;
+    my $self = shift;
     return $self->{filename};
 }
- 
+
 sub schema_version {
     my $self = shift;
     return $self->metadata->schema_version;
 }
 
-
 sub set_message {
     my ( $self, $message ) = @_;
-     $DB::single = 1;
-    $self->metadata->set_message($message) if ($self->metadata);
+    $DB::single = 1;
+    $self->metadata->set_message($message) if ( $self->metadata );
 }
-
 
 ###############################
 #
@@ -512,14 +534,14 @@ sub set_message {
 package Rdiffopke::Userkey;
 
 sub new {
-	my $class = shift;
+    my $class  = shift;
     my %params = @_;
     return unless ( defined $params{dir} );
     return bless {
         dir        => $params{dir},
         error_code => 0,
         verbose    => $params{verbose},
-        filename    => "$params{dir}/pubkey",
+        filename   => "$params{dir}/pubkey",
     };
 
 }
