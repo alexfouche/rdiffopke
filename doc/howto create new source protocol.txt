@@ -1,0 +1,4 @@
+If you want to add a new source protocol, you just need to
+	- add a new case in the Rdiffopke::Filesource new constructor, where the url is parsed and return a blessed instance of your source object
+	- create your source object, as Rdiffopke::Filesource::_<yourclassnamehere> subclass, and override the few needed functions. You can simply take the below template and fill it with your code
+	- Add all your class code in the rdiffopke perl script, at the end of the BEGIN block
