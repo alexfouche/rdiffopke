@@ -37,6 +37,9 @@ sub verbose_message($) {
 }
 
 
+ 
+BEGIN {
+
 ###############################
 #
 # Class:  Rdiffopke
@@ -190,6 +193,9 @@ Source only support local directory or ftp:// at this time",
     $self->terminate( $error_code, $errors{$error_code} );
 }
 
+1;
+
+
 ###############################
 #
 # Class:  Rdiffopke::Metadata
@@ -301,7 +307,8 @@ sub _upgrade_schema {
         1 => [
 'create table diffs (diff integer primary key not null, date_begin datetime not null, date_end datetime not null, message text);',
 'create table options (name text primary key not null, value text);',
-'create table files (file_id integer primary key autoincrement not null, diff integer not null, path_id integer not null, localfile_id integer, retrieval_date datetime not null, owner text, "group" text, mode text, mdate datetime not null, type text not null, size integer not null, target text );',
+'create table files (file_id integer primary key autoincrement not null, diff integer not null, path_id integer not null, localfile_id integer,
+	retrieval_date datetime not null, owner text, "group" text, mode text, mdate datetime not null, type text not null, size integer not null, target text );',
 'create table paths (path_id integer primary key autoincrement not null, path text not null);',
 'create table localfiles (localfile_id integer primary key autoincrement not null, path text not null, size integer not null, key_id integer);',
 'create table keys ( key_id integer primary key autoincrement not null, key blob not null);',
@@ -353,6 +360,9 @@ sub set_message {
       if ( $self->diff );
 
 }
+
+1;
+
 
 ###############################
 #
@@ -475,6 +485,9 @@ sub set_message {
     $self->metadata->set_message($message) if ( $self->metadata );
 }
 
+1;
+
+
 ###############################
 #
 # Class:  Rdiffopke::Userkey
@@ -502,4 +515,7 @@ sub new {
 sub exists {
     my $self = shift;
     ( -e $self->_filename ) ? 1 : 0;
+}
+
+1;
 }
