@@ -1,30 +1,27 @@
 
 ###############################
-    #
+#
     # Class:  Rdiffopke::Userkey
     #
 ###############################
 
-    package Rdiffopke::Userkey;
+package Rdiffopke::Userkey;
+use Moose;
 
-    use base qw(Class::Accessor::Fast );
-    Rdiffopke::Userkey->mk_ro_accessors qw( _filename );
+has '_dir' =>  ( is => 'wo', isa => 'Str', required=>1, trigger   => \&_set_filename );
+has '_filename' => ( is => 'ro', isa => 'Str',  builder=>'_set_filename');
+has '_verbose' => ( is => 'ro', isa => 'Bool', default => 0 );
 
-    sub new {
-        my $class  = shift;
-        my %params = @_;
-        return unless ( defined $params{dir} );
-        return bless {
-            error_code => 0,
-            _verbose   => $params{verbose},
-            _filename  => "$params{dir}/pubkey",
-        };
-
-    }
-
+   
     sub exists {
         my $self = shift;
         ( -e $self->_filename ) ? 1 : 0;
     }
 
-    1;
+sub _set_filename {
+	my $self = shift;
+  return $self->_dir . '/pubkey';
+}
+
+	no Moose;
+	__PACKAGE__->meta->make_immutable;

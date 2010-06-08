@@ -21,8 +21,8 @@ subscribe_to_signals $rdiffopke;
 
 $rdiffopke->get_params_and_input;
 $rdiffopke->init_repository;
+$rdiffopke->prepare_source;
 
-#$rdiffopke->check_source;
 $rdiffopke->proceed;
 $rdiffopke->terminate;
 
