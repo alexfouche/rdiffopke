@@ -1,0 +1,94 @@
+#!/usr/bin/perl
+
+use strict;
+sub subscribe_to_signals;
+sub verbose_message;
+sub import_required_modules;
+sub get_params_and_input;
+
+use Rdiffopke;
+use Rdiffopke::Exception;
+
+
+# Check if required Perl modules are installed and import them
+import_required_modules;
+
+subscribe_to_signals;
+
+# Create our program instance from supplied parameters, variables or input
+my $rdiffopke = Rdiffopke->new(get_params_and_input);
+
+
+
+# Do all report, handles close, cleanup and terminate
+$rdiffopke->terminate;
+
+# We should never get there
+exit -1;
+
+#
+#
+###############################
+#
+# Miscelleaneous functions
+#
+###############################
+
+
+sub import_required_modules {
+    my @modules =
+      qw( Moose Try::Tiny Exception::Class Getopt::Std DBI DBD::SQLite Path::Class FileHandle );
+
+	# Try to include all modules and record the missing ones in @messages
+    my $missing_modules = "";
+    foreach (@modules) {
+        eval "use $_" ;
+        $missing_modules .= "$_, " if ($@);
+    }
+
+	if ($missing_modules) {Rdiffopke::Exception->throw(error=>"Some Perl modules are missing for rdiffopke to run. Missing: $missing_modules \n");}
+}
+
+
+sub subscribe_to_signals {
+    $SIG{INT} = sub {
+        Rdiffopke::Exception::Signal->throw(
+            error  => 'Received sigINT',
+            signal => 'INT'
+        );
+    };
+    $SIG{TERM} = sub {
+        Rdiffopke::Exception::Signal->throw(
+            error  => 'Received sigTERM',
+            signal => 'TERM'
+        );
+    };
+}
+
+sub verbose_message($) {
+    my $message = shift;
+    print localtime(time) . "   $message\n";
+}
+
+sub get_params_and_input {
+	use Getopt::Std;
+	my $getopts = {};
+
+    getopts( 'vu:p:d:s:ic:x', $getopts )
+      or Rdiffopke::Exception::BadParams->throw(
+        error => "Wrong command line parameters\n" );
+
+    unless ( $getopts->{s} && $getopts->{d} ) {
+        Rdiffopke::Exception::BadParams->throw(
+            error => "Missing some required command line parameters\n" );
+    }
+
+    my %feed_to_rdiffopke = ();
+    $feed_to_rdiffopke{verbose}        = 1             if ( $getopts->{v} );
+    $feed_to_rdiffopke{no_encryption}  = 1             if ( $getopts->{x} );
+    $feed_to_rdiffopke{source_url}     = $getopts->{s} if ( $getopts->{s} );
+    $feed_to_rdiffopke{repository_url} = $getopts->{d} if ( $getopts->{d} );
+
+    return %feed_to_rdiffopke;
+}
+

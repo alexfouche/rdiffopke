@@ -5,11 +5,20 @@
     #
 ###############################
 
-    package Rdiffopke::Repository;
+package Rdiffopke::Repository;
 
-    use base qw(Class::Accessor::Fast );
+use Moose;
+use Rdiffopke::Metadata;
+use Rdiffopke::Userkey;
+   
+has 'userkey' =>(is=>'ro', isa=>'Rdiffopke::Userkey' );
+has 'metadata' =>(is=>'ro', isa=>'Rdiffopke::Metadata' );
+has 'dir' =>  ( is => 'wo', isa => 'Str', required => 1,  );
+has 'verbose'  => ( is => 'ro', isa => 'Bool', default => 0 );
+has 'no_encryption' => ( is => 'rw', isa => 'Bool', default => 0 );
 
-    Rdiffopke::Repository->mk_accessors qw( error_code );
+
+
     Rdiffopke::Repository->mk_ro_accessors
       qw( diff _dir _verbose _no_encryption metadata userkey);
 

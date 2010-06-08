@@ -29,29 +29,24 @@ $rdiffopke->terminate;
 # We should never get there
 exit -1;
 
-
-
-
-
-
-
+#
+#
 ###############################
-    #
-    # Miscelleaneous functions
-    #
+#
+# Miscelleaneous functions
+#
 ###############################
 
-    sub subscribe_to_signals {
-        my $rdiffopke = shift;
-        $SIG{INT}  = sub { $rdiffopke->quit_error(10); };
-        $SIG{TERM} = sub { $rdiffopke->quit_error(11); };
-    }
+sub subscribe_to_signals {
+    my $rdiffopke = shift;
+    $SIG{INT}  = sub { $rdiffopke->quit_error(10); };
+    $SIG{TERM} = sub { $rdiffopke->quit_error(11); };
+}
 
-    sub verbose_message($) {
-        my $message = shift;
-        print localtime(time) . "   $message\n";
-    }
-
+sub verbose_message($) {
+    my $message = shift;
+    print localtime(time) . "   $message\n";
+}
 
 __DATA__
 

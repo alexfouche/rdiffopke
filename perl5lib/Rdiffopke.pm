@@ -7,14 +7,23 @@
 
 package Rdiffopke;
 
-use base qw(Class::Accessor::Fast );
-Rdiffopke->mk_accessors(
-    qw( repository no_encryption source rdiff_dir verbose ));
-Rdiffopke->mk_ro_accessors(qw( version need_metadata_schema_version ));
+use Moose;
+use Rdiffopke::Repository;
+use Rdiffopke::Filesource;
+
+has 'no_encryption' => ( is => 'rw', isa => 'Bool', default => 0 );
+has 'verbose'       => ( is => 'rw', isa => 'Bool', default => 0 );
+has 'source'     => ( is => 'rw', isa => 'Rdiffopke::Filesource', );
+has 'source_url' => ( is => 'rw', isa => 'Str' );
+has 'repo_url'   => ( is => 'rw', isa => 'Str' );
+has 'repository' => ( is => 'rw', isa => 'Rdiffopke::Repository', );
+has 'version'    => ( is => 'ro', isa => 'Num', default => 0.1 );
+has 'need_metadata_schema_version' =>
+  ( is => 'need_metadata_schema_version', isa => 'Int', default => 1 );
 
 sub import_required_modules {
     my @modules =
-      qw( Class::Accessor Class::Accessor::Fast Getopt::Std DBI DBD::SQLite Path::Class FileHandle  );
+      qw( Moose Getopt::Std DBI DBD::SQLite Path::Class FileHandle  );
 
     # File::Path::Hashed Path::Class Path::Class::File Path::Class::Dir
     my @messages = ();
@@ -32,28 +41,19 @@ sub import_required_modules {
     }
 }
 
-sub new {
-    return bless {
-        version                      => 0.1,
-        need_metadata_schema_version => 1,
-        no_encryption                => 0
-    };
-}
-
 sub get_params_and_input {
     my $self    = shift;
     my $getopts = {};
 
-    getopts( 'vu:p:d:s:ic:x', $getopts ) or quit_error(8);
+    getopts( 'vu:p:d:s:ic:x', $getopts ) or die '8';
 
     $self->verbose(1) if ( $getopts->{v} );
     $self->no_encryption( $getopts->{x} );
     $self->source( $getopts->{s} );
-    $self->rdiff_dir( $getopts->{d} );
+    $self->repo_url( $getopts->{d} );
 
-    unless ( $self->source && $self->rdiff_dir ) {
-        $DB::single = 1;
-        $self->quit_error(8);
+    unless ( $self->source && $self->repo_url ) {
+        die '8';
     }
 
 }
@@ -63,15 +63,29 @@ sub init_repository {
 
     $self->repository(
         Rdiffopke::Repository->new(
-            dir                 => $self->rdiff_dir,
+            dir                 => $self->repo_url,
             verbose             => $self->verbose,
             no_encryption       => $self->no_encryption,
             upgrade_metadata_to => $self->need_metadata_schema_version
         )
     );
-    if ( !$self->repository->init ) {
-        $self->quit_error( $self->repository->error_code );
-    }
+
+    !$self->repository->init;
+
+}
+
+sub prepare_source {
+    my $self = shift;
+
+    $self->source( Rdiffopke::Filesource->new( url => $self->source_url ) );
+    $self->source->prepare;
+
+}
+
+sub proceed {
+    my $self = shift;
+
+    $self->repository->proceed( $self->source->get_detailed_file_list );
 
 }
 
@@ -160,19 +174,5 @@ Source only support local directory or ftp:// at this time",
     $self->terminate( $error_code, $errors{$error_code} );
 }
 
-sub prepare_source {
-   my $filesource = Rdiffopke::Filesource->new( url => $self->source );
-	$filesource->prepare;
-	
-}
-
-sub proceed {
-    my $self = shift;
-
- 
-    $self->repository->proceed( $filesource->get_detailed_file_list);
-
-}
-
-1;
-
+no Moose;
+__PACKAGE__->meta->make_immutable;
