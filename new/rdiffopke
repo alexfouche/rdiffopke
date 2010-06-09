@@ -18,13 +18,15 @@ subscribe_to_signals;
 # Create our program instance from supplied parameters, variables or input
 my $rdiffopke = Rdiffopke->new(get_params_and_input);
 
+$rdiffopke->prepare_source;
 
 
-# Do all report, handles close, cleanup and terminate
+# Do all report, handles close, cleanup
 $rdiffopke->terminate;
 
-# We should never get there
-exit -1;
+
+exit 0;
+
 
 #
 #

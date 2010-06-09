@@ -14,6 +14,11 @@ use Exception::Class (
         description => 'User supplied wrong parameters or input to start program',
     },
 
+    Rdiffopke::Exception::FileSource => {
+        isa         => 'Rdiffopke::Exception',
+        description => 'Errors related to source directory or files',
+    },
+
 );
 
 1;
