@@ -19,3 +19,5 @@ sub get_detailed_file_list {
 
 no Moose;
 __PACKAGE__->meta->make_immutable;
+
+1;
