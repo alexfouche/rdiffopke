@@ -17,7 +17,6 @@ subtype 'PositiveInt'
      => where { $_ > 0 }
      => message { 'Only positive greater than zero integers accepted' };
 
-
 has 'buffer_read_size' => (is=>'rw', isa=>'PositiveInt', default=>100*1024);
 
 sub BUILD {
@@ -55,6 +54,8 @@ sub BUILD {
 
 override 'read' => sub {
     my ( $self, $buf, $readsize ) = @_;
+
+	readsize = $self->buffer_read_size unless (defined $readsize);
 
     unless ( $self->type eq 'file' ) {
         Rdiffopke::Exception::File->throw( error => "The file type for file "
