@@ -42,6 +42,19 @@ sub open_r {}
 
 sub close { }
 
+sub is_file {
+	my $self = shift;
+$DB::single=1;
+	return ( $self->type eq 'file' );
+}
+sub is_dir {
+	my $self = shift;
+	return ( $self->type eq 'dir' );
+}
+sub is_slink {
+	my $self = shift;
+	return ( $self->type eq 'slink' );
+}
 
 no Moose;
 __PACKAGE__->meta->make_immutable;

@@ -19,6 +19,11 @@ use Exception::Class (
         description => 'Errors related to source directory or files',
     },
 
+    Rdiffopke::Exception::File => {
+        isa         => 'Rdiffopke::Exception',
+        description => 'Errors related to file objects',
+    },
+
 );
 
 1;

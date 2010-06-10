@@ -22,6 +22,18 @@ $rdiffopke->prepare_source;
 
 my $detailed_file_list = $rdiffopke->source->get_detailed_file_list;
 
+$detailed_file_list->rewind;
+while  ( my $file=$detailed_file_list->next ){
+	if ($file->is_file) {
+		$file->open_r;
+		my $buf;
+		while ( my $bytes = $file->read($buf, 10)) {
+			print "$buf-----";
+		}
+	}
+	
+}
+
 
 
 # Do all report, handles close, cleanup

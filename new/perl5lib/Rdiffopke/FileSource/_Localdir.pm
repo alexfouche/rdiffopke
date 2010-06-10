@@ -36,7 +36,6 @@ override 'get_detailed_file_list' => sub {
 #    $dir->recurse(
 #        callback => sub {
 	find( sub {
-			$DB::single=1;
             my $stat  = stat($_);
             $file_list->add(
                 Rdiffopke::File::_LocalFile->new(
