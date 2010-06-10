@@ -15,8 +15,6 @@ has 'url'       => ( is => 'ro', isa => 'Str', required=>1 );
 sub instance {
 my $self = shift;
 
-$DB::single=1;
-
 $_=$self->url;
 	SWITCH:  {
 	    /^file:\/\// && do { $self->url( $self->url =~ s-^file://--); last SWITCH; };

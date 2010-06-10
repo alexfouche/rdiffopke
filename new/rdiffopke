@@ -20,6 +20,9 @@ my $rdiffopke = Rdiffopke->new(get_params_and_input);
 
 $rdiffopke->prepare_source;
 
+my $detailed_file_list = $rdiffopke->source->get_detailed_file_list;
+
+
 
 # Do all report, handles close, cleanup
 $rdiffopke->terminate;

@@ -11,8 +11,6 @@ use Moose;
 use Rdiffopke::FileSourceBuilder;
 use Rdiffopke::FileSource;
 
-
-
 has 'no_encryption' => ( is => 'rw', isa => 'Bool', default => 0 );
 has 'verbose'       => ( is => 'rw', isa => 'Bool', default => 0 );
 has 'source'     => ( is => 'ro', isa => 'Rdiffopke::FileSource', writer=>'_set_source'  );
@@ -26,7 +24,7 @@ has 'need_metadata_schema_version' =>
 
 sub _create_source {
 	my $self=shift;
-$DB::single = 1;
+
 	$self->_set_source( Rdiffopke::FileSourceBuilder->new(url=>$self->source_url)->instance);
 }
 
