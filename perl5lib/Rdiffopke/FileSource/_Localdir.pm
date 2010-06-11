@@ -21,34 +21,36 @@ sub BUILD {
 
     unless ( -d $self->url ) {
         Rdiffopke::Exception::FileSource->throw(
-            error => "Local directory " . $self->url . " is not recognized" );
+            error => "Local directory " . $self->url . " does not exists" );
     }
 }
 
-override 'get_detailed_file_list' => sub {	
+override 'get_detailed_file_list' => sub {
     my $self = shift;
 
     my $file_list = Rdiffopke::Filelist->new;
     my $dir       = Path::Class::Dir->new( $self->url )->cleanup->absolute;
 
 ## Path::Class::Dir->recurse() follows symlinks !!! ->use File::Find instead
-#    $dir->recurse(
-#        callback => sub {
-	find( sub {
-            my $stat  = stat($_);
+    #    $dir->recurse(
+    #        callback => sub {
+    find(
+        sub {
+            my $stat = stat($_);
             $file_list->add(
                 Rdiffopke::File::_LocalFile->new(
-                    path  => $File::Find::name,
-                    mode  => $stat->mode,
-                    uid   => $stat->uid,
-                    gid   => $stat->gid,
-                    size  => $stat->size,
-                   # mtime => scalar( gmtime( $stat->mtime ) ),
+                    path => $File::Find::name,
+                    mode => $stat->mode,
+                    uid  => $stat->uid,
+                    gid  => $stat->gid,
+                    size => $stat->size,
+
+                    # mtime => scalar( gmtime( $stat->mtime ) ),
                     mtime => $stat->mtime,
                 )
             );
         },
-$dir->stringify,
+        $dir->stringify,
     );
 
     return $file_list;

@@ -18,7 +18,7 @@ subscribe_to_signals;
 # Create our program instance from supplied parameters, variables or input
 my $rdiffopke = Rdiffopke->new(get_params_and_input);
 
-$rdiffopke->init_repository;
+$rdiffopke->prepare_repository;
 $rdiffopke->prepare_source;
 
 
@@ -106,7 +106,7 @@ sub get_params_and_input {
     $feed_to_rdiffopke{verbose}        = 1             if ( $getopts->{v} );
     $feed_to_rdiffopke{no_encryption}  = 1             if ( $getopts->{x} );
     $feed_to_rdiffopke{source_url}     = $getopts->{s} if ( $getopts->{s} );
-    $feed_to_rdiffopke{repository_url} = $getopts->{d} if ( $getopts->{d} );
+    $feed_to_rdiffopke{repo_url} = $getopts->{d} if ( $getopts->{d} );
 
     return %feed_to_rdiffopke;
 }

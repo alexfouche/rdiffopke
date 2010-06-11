@@ -10,8 +10,9 @@ use Exception::Class (
     },
 
     Rdiffopke::Exception::BadParams => {
-        isa         => 'Rdiffopke::Exception',
-        description => 'User supplied wrong parameters or input to start program',
+        isa => 'Rdiffopke::Exception',
+        description =>
+          'User supplied wrong parameters or input to start program',
     },
 
     Rdiffopke::Exception::FileSource => {
@@ -24,10 +25,19 @@ use Exception::Class (
         description => 'Errors related to file objects',
     },
 
+    Rdiffopke::Exception::Repository => {
+        isa         => 'Rdiffopke::Exception',
+        description => 'Errors related to rdiff repository',
+    },
+
+    Rdiffopke::Exception::Metadata => {
+        isa         => 'Rdiffopke::Exception',
+        description => 'Errors related to metadata',
+    },
+
 );
 
 1;
-
 
 __END__
 
@@ -98,7 +108,6 @@ Source only support local directory or ftp:// at this time",
 
     );
 
-    $DB::single = 1;
     print STDERR localtime(time) . "   $errors{$error_code}\n";
     foreach (@messages) {
         print STDERR localtime(time) . "   $_\n";

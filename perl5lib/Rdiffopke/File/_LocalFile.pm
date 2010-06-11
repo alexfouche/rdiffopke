@@ -7,21 +7,16 @@
 package Rdiffopke::File::_LocalFile;
 
 use Moose;
-#use Moose::Util::TypeConstraints;
 use FileHandle;
+use Rdiffopke::SubTypes;
 #use IO::Handle '_IOFBF';
 
 extends 'Rdiffopke::File';
 
-# Does not fucking work, see http://stackoverflow.com/questions/3011880/perl-mooseutiltypeconstraints-bug-what-is-this-error-about-the-name-has-inv
-#subtype 'PositiveInt'
-# 	 =>	as 'Int'
-#     => where { $_ >0 }
-#     => message { 'Only positive greater than zero integers accepted' };
-
-#has 'buffer_read_size' => (is=>'rw', isa=>'PositiveInt', default=>100*1024);
-has 'buffer_read_size' => (is=>'rw', isa=>'Int', default=>100*1024);
-has '_handle' => (isa=>'Maybe[FileHandle]', is=>'ro', writer=>'_create_handle');
+has 'buffer_read_size' =>( is => 'rw', isa => 'Int', default => 100 * 1024 );
+#has 'buffer_read_size' => (is=>'rw', isa=>'PositiveInt', default=>100*1024); # TOFIX why is TypeConstraint not working ?
+has '_handle' =>
+  ( isa => 'Maybe[FileHandle]', is => 'ro', writer => '_create_handle' );
 
 sub BUILD {
     my $self = shift;
@@ -57,12 +52,12 @@ sub BUILD {
 }
 
 override 'read' => sub {
-    my $self = $_[0];  # Do not modify @_, to use the trick at http://stackoverflow.com/questions/3011653/what-is-the-magic-behind-perl-read-function-and-buffer-which-is-not-a-ref
- 	my $readsize  = $_[2];
+    my $self = $_[0]
+      ; # Do not modify @_, to use the trick at http://stackoverflow.com/questions/3011653/what-is-the-magic-behind-perl-read-function-and-buffer-which-is-not-a-ref
+    my $readsize = $_[2];
 
-	$readsize = $self->buffer_read_size unless (defined $readsize);
+    $readsize = $self->buffer_read_size unless ( defined $readsize );
 
-	$DB::single=1;
     unless ( $self->type eq 'file' ) {
         Rdiffopke::Exception::File->throw( error => "The file type for file "
               . $self->path
@@ -79,8 +74,8 @@ override 'read' => sub {
 };
 
 override 'close' => sub {
-	my $self = shift;
- 
+    my $self = shift;
+
     $self->_handle->close if ( defined $self->_handle );
 };
 
@@ -88,15 +83,17 @@ override 'open_r' => sub {
     my $self = shift;
 
     unless ( $self->type eq 'file' ) {
-        Rdiffopke::Exception::File->throw( error => "The file type for file " . $self->path . " can not be opened\n" );
-    };
+        Rdiffopke::Exception::File->throw( error => "The file type for file "
+              . $self->path
+              . " can not be opened\n" );
+    }
 
     unless ( $self->_handle->open( $self->path, 'r' ) ) {
         Rdiffopke::Exception::File->throw(
             error => "Can not open file " . $self->path . " for reading\n" );
-    };
-	
-#	$self->_handle->setvbuf($buffer, _IOFBF, 0x10000);
+    }
+
+    #	$self->_handle->setvbuf($buffer, _IOFBF, 0x10000);
 };
 
 no Moose;

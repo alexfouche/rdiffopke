@@ -9,6 +9,7 @@ package Rdiffopke::FileSource;
 use Moose;
 
 has 'url' => ( is => 'ro', isa => 'Str', required => 1 );
+has 'verbose' => (is=>'rw', isa =>'Int', default=>0);
 
 sub BUILD {
 	my $self=shift;

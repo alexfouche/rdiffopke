@@ -8,12 +8,9 @@ package Rdiffopke::File;
 
 use Moose;
 use FileHandle;
-use Moose::Util::TypeConstraints;
-
-subtype 'FileType'
-     => as 'Str'
-     => where { $_ =~ 'file' || $_ =~ 'dir' || $_ =~ 'slink' }
-     => message { "FileType is either 'file', 'dir' or 'slink'" };
+use Rdiffopke::SubTypes;
+#use namespace::autoclean; # because attribute 'type' and its accessors conflict with method 'type' of Moose::Util::TypeConstraints
+use Rdiffopke::SubTypes;
 
 has 'path' =>(isa=>'Str', is=>'ro', required=>1);
 has 'mode' =>(is=>'ro', isa=>'Any' );
@@ -21,8 +18,9 @@ has 'uid' =>(is=>'ro', isa=>'Any' );
 has 'gid' =>(is=>'ro', isa=>'Any' );
 has 'size' =>(is=>'ro', isa=>'Int' );
 has 'mtime' =>(is=>'ro', isa=>'Int' );
-has 'type' =>(is=>'ro', isa=>'FileType', writer=>'_set_type' );
+has 'type' =>(is=>'ro', isa=>'Rdiffopke::FileType', writer=>'_set_type' );
 has 'processed' =>(is=>'ro', isa=>'Bool', writer=>'mark_as_processed' );
+has 'verbose' => (is=>'rw', isa =>'Int', default=>0);
 
 sub BUILD {
 	my $self = shift;
@@ -43,7 +41,6 @@ sub close { }
 
 sub is_file {
 	my $self = shift;
-$DB::single=1;
 	return ( $self->type eq 'file' );
 }
 sub is_dir {

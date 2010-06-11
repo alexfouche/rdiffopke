@@ -22,7 +22,6 @@ has '_iterator' => (is=>'rw', isa=>'Int', default=>0 );
 sub add {
     my ( $self, $item ) = @_;
 
-$DB::single=1;
 #    if ( defined($item) && $item->isa('Rdiffopke::File') ) {
 #        $self->list->{ $item->path } = $item;
 #    }

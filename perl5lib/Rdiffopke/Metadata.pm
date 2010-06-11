@@ -1,86 +1,110 @@
+###############################
+#
+# Class:  Rdiffopke::Metadata
+#
+###############################
 
+package Rdiffopke::Metadata;
 
-    sub init {
-        my $self   = shift;
-        my %params = @_;
+use Moose;
+use DBI;
+use Try::Tiny;
+use Rdiffopke::Exception;
+use Rdiffopke::SubTypes;
 
-        if ( -e $self->_filename ) {
+has 'dbfile'     => ( is => 'ro', isa => 'Str',         required => 1 );
+has 'upgrade_to' => ( is => 'ro', isa => 'Int', required => 1 ); 
+#has 'upgrade_to' => ( is => 'ro', isa => 'PositiveInt', required => 1 );  # TOFIX why is TypeConstraint not working ?
+has '_dbh'       => ( is => 'rw', isa => 'Maybe[DBI::db]' );
+has 'verbose'    => ( is => 'rw', isa => 'Int',        default  => 0 );
+has 'diff' => ( is => 'ro', isa => 'Int', writer => '_set_diff' );    # this is the current diff the metadata is dealing with
+#has 'diff' => ( is => 'ro', isa => 'PositiveInt', writer => '_set_diff' ); # TOFIX why is TypeConstraint not working ?
+has 'schema_version' =>
+  ( is => 'ro', isa => 'Int', writer => '_set_schema_version' );
 
-            unless ( $self->_connect ) {
-                return 0;    # $self->error_code is already set
-            }
+sub BUILD {
+    my $self = shift;
 
-            eval {
-                local $self->_dbh->{RaiseError} = 1;
-                local $self->_dbh->{PrintError} = 0;
-                $DB::single = 1;
-                $self->schema_version(
-                    $self->_dbh->selectrow_array(
-'select value from options where name = "metadata_version";'
-                    )
-                );
-            };
-            if ($@) {
-                $self->error_code(9);
-                return 0;
-            }
-            unless ( defined( $self->schema_version )
-                && $self->schema_version > 0 )
-            {
-                $self->error_code(9);
-                return 0;
-            }
-
-            $self->_upgrade_schema_to( $params{upgrade_metadata_to} )
-              if ( $self->schema_version < $params{upgrade_metadata_to} );
-
+$DB::single=1;
+    if ( -e $self->dbfile ) {
+        ::verbose_message("Metadata exists, checking schema version")
+          if ( $self->verbose );
+        $self->_connect;
+        try {
+            $self->_set_schema_version(
+                $self->_dbh->selectrow_array(
+                    'select value from options where name = "metadata_version";'
+                )
+            );
         }
-        else {
-            unless ( $self->_connect ) {
-                return 0;    # $self->error_code is already set
-            }
-            $self->{schema_version} = 0;
-        }
-
-        local $self->_dbh->{PrintError} = 0;
-
-        $self->_dbh->do("PRAGMA foreign_keys = ON");
-        $self->_dbh->do("PRAGMA default_synchronous = OFF");
-
-        if (   $params{upgrade_metadata_to}
-            && $self->schema_version < $params{upgrade_metadata_to} )
+        catch {
+            Rdiffopke::Exception::Metadata->throw(
+                error => "Could not read metadata version from metadata file:\n"
+                  . $self->_dbh->errstr );
+        };
+        unless ( defined( $self->schema_version )
+            && $self->schema_version > 0 )
         {
-            unless ( $self->_upgrade_schema_to( $params{upgrade_metadata_to} ) )
-            {
-                return 0;    # $self->error_code is already set
-            }
-
+            Rdiffopke::Exception::Metadata->throw(
+                error => "Could not read metadata version from metadata file:\n"
+                  . $self->_dbh->errstr );
         }
 
-        return 1;            # Returns true
+        $self->_upgrade_schema if ( $self->schema_version < $self->upgrade_to );
+    }
+    else {
+        ::verbose_message("Metadata does not exist, creating...")
+          if ( $self->verbose );
+        $self->_connect;
+        $self->_set_schema_version(0);
+        $self->_upgrade_schema;
+        ::verbose_message("Metadata created")
+          if ( $self->verbose );
+    }
+}
+
+sub _connect {
+    my $self = shift;
+
+    ::verbose_message("Connecting to metadata")
+      if ( $self->verbose );
+    my $dbh = DBI->connect( "dbi:SQLite:dbname=" . $self->dbfile, "", "" );
+    unless ( defined $dbh ) {
+        Rdiffopke::Exception::Metadata->throw( error =>
+"Metadata file seems to be corrupted. It should be a SQLite database\n"
+        );
     }
 
-   
-    sub _connect {
-        my $self = shift;
+    $dbh->{RaiseError} = 1;
+    $dbh->{PrintError} = 0;
+#    $dbh->do("PRAGMA foreign_keys = ON");
+#    $dbh->do("PRAGMA default_synchronous = OFF");
 
-        my $dbh = DBI->connect( "dbi:SQLite:dbname=$self->_filename", "", "" );
-        unless ( defined $dbh ) {
-            $self->error_code(6);
-            return 0;
-        }
+    $self->_dbh($dbh);
+}
 
-        $self->{_dbh} = $dbh;
-        return 1;    # Returns true
-    }
+sub _disconnect {
+    my $self = shift;
 
+    ::verbose_message("Disconnecting metadata")
+      if ( $self->verbose );
+    $self->_dbh->disconnect;
+    $self->_dbh(undef);
+}
 
-    sub _upgrade_schema_to {
-        my $self       = shift;
-        my $upgrade_to = shift;
+sub close {
+    $_[0]->_disconnect;
+}
 
-        my %db_schema_versions = (
-            1 => [
+sub DEMOLISH {
+    $_[0]->close;
+}
+
+sub _upgrade_schema {
+    my $self = shift;
+
+    my %db_schema_versions = (
+        1 => [
 'create table diffs (diff integer primary key not null, date_begin datetime not null, date_end datetime not null, message text);',
 'create table options (name text primary key not null, value text);',
 'create table files (file_id integer primary key autoincrement not null, diff integer not null, path_id integer not null, localfile_id integer,
@@ -88,52 +112,49 @@
 'create table paths (path_id integer primary key autoincrement not null, path text not null);',
 'create table localfiles (localfile_id integer primary key autoincrement not null, path text not null, size integer not null, key_id integer);',
 'create table keys ( key_id integer primary key autoincrement not null, key blob not null);',
-            ],
-        );
+'insert into options values("metadata_version", 1);',
+        ],
+    );
 
-        verbose_message("Metadata schema needs upgrade, do not interrupt...")
-          if ( $self->_verbose );
+    ::verbose_message("Metadata schema needs upgrade, do not interrupt...")
+      if ( $self->verbose );
 
-        for ( my $i = $self->schema_version + 1 ; $i <= $upgrade_to ; $i++ ) {
+$DB::single=1;
+    for ( my $i = $self->schema_version +1 ; $i <= $self->upgrade_to ; $i++ ) {
 
-            eval {
-                local $self->_dbh->{RaiseError} = 1;
-                local $self->_dbh->{PrintError} = 0;
-                $self->_dbh->begin_work;
-                foreach ( @{ $db_schema_versions{$i} } ) {
-                    $DB::single = 1;
-                    $self->_dbh->do($_);
-                }
-                $self->_dbh->do(
-"update options set value = $i where name = 'metadata_version';"
-                );
-            };
-            if ($@) {
-                $self->_dbh->rollback;
-                $self->error_code(14);
-                return 0;
+        try {
+            $self->_dbh->begin_work;
+            foreach ( @{ $db_schema_versions{$i} } ) {
+                $self->_dbh->do($_);
             }
-            else {
-                $self->_dbh->commit;
-                $self->{schema_version} = $i;
-
-            }
+            $self->_dbh->do(
+                "update options set value = $i where name = 'metadata_version';"
+            );
         }
-
-        verbose_message("Finished upgrade of metadata schema")
-          if ( $self->_verbose );
-
-        return 1;    # Returns true
+        catch {
+            $self->_dbh->rollback;
+            Rdiffopke::Exception::Metadata->throw(
+                error => "An error occurred while upgrading metadata schema:\n"
+                  . $self->_dbh->errstr );
+        };
+        $self->_dbh->commit;
+        $self->_set_schema_version ( $i);
     }
 
-    sub set_message {
-        my ( $self, $message ) = @_;
+    ::verbose_message("Finished upgrade of metadata schema")
+      if ( $self->verbose );
+}
 
-        $DB::single = 1;
-        $self->_dbh->do(
-            "update diffs set message = $message where diff = ${self->diff};")
-          if ( $self->diff );
+sub set_message {
+    my ( $self, $message ) = @_;
 
-    }
+    $self->_dbh->do(
+        "update diffs set message = $message where diff = " . $self->diff )
+      if ( $self->diff && defined( $self->_dbh ) );
 
-    1;
+}
+
+no Moose;
+__PACKAGE__->meta->make_immutable;
+
+1;
