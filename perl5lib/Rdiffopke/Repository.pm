@@ -21,6 +21,9 @@ has 'metadata' =>
 has 'userkey' =>
   ( is => 'ro', isa => 'Rdiffopke::UserKey', writer => '_set_userkey' );
 has 'verbose' => ( is => 'rw', isa => 'Int', default => 0 );
+has '_to_discard_from_repo'=> ( is => 'rw', isa => 'ArrayRef', default => sub {[]} );
+has '_to_transfer' => ( is => 'rw', isa => 'ArrayRef', default => sub {[]} );
+has '_to_update_metadata' => ( is => 'rw', isa => 'ArrayRef', default => sub {[]} );
 
 sub BUILD {
     my $self = shift;
@@ -139,24 +142,45 @@ sub DEMOLISH {
 
 sub compare_files {
     my $self = shift;
+my $source_file_list = shift;
 	
-	my $source_file_list = $self->source->get_detailed_file_list;
-	my $repo_file_list = $self->metadata->get_detailed_file_list;
+	$DB::single=1;	
+		unless (defined ($source_file_list) && $source_file_list->isa('Rdiffopke::Filelist') ) { Rdiffopke::Exception::Repository->throw(
+        error => "Function 'compare_files' needs to be given a FileList instance of the files on the source\n" );}
+	
+	# I suppose if lists are big, it is better to use directly variables instead of accessors
 
-	$repo_file_list->rewind;
-	$source_file_list->rewind;
+		my $repo_file_list = $self->metadata->get_detailed_file_list;
+		
+my @to_transfer=();
+my @to_update_metadata=();
+my @to_discard_from_repo=();
 
+foreach (keys %$source_file_list) {
+	if ($repo_file_list->{$_}) {
+		# It exists in repository, so check if metadata is modified
+		# mode, uid, gid, size, mtime, type, 
+	if ($source_file_list->{$_}->mdate ne $repo_file_list->{$_}->mdate 
+			|| $source_file_list->{$_}->size != $repo_file_list->{$_}->size 
+					|| ($source_file_list->{$_}->type ne $repo_file_list->{$_}->type && $source_file_list->{$_}->type ne 'dir' )) {
+							push (@to_transfer, $source_file_list->{$_}) ;
+							next;
+					}
+	    push (@to_update_metadata,  $source_file_list->{$_}) 			if ($source_file_list->{$_}->mode ne $repo_file_list->{$_}->mode 
+						|| $source_file_list->{$_}->uid ne $repo_file_list->{$_}->uid 
+							|| $source_file_list->{$_}->gid ne $repo_file_list->{$_}->gid
+								|| $source_file_list->{$_}->type ne $repo_file_list->{$_}->type);			
+	$repo_file_list->{$_}->{processed}=1;
+	}else {
+		# Needs transfer
+		push @to_transfer, $source_file_list->{$_};
+	}
+}
+ push (@to_discard_from_repo ,$repo_file_list->{$_}) foreach (grep {! $repo_file_list->{$_}->{processed}} keys (%$repo_file_list));
 
-
-	while  ( my $file=$detailed_file_list->next ){
-		if ($file->is_file) {
-			$file->open_r;
-			my $buf;
-			while ( my $bytes = $file->read($buf, 10)) {
-				print "$buf-----";
-			}
-		}
-
+$self->_to_discard_from_repo(\@to_discard_from_repo);
+$self->_to_update_metadata(\@to_update_metadata);
+$self->_to_transfer(\@to_transfer);
 }
 
 no Moose;

@@ -30,15 +30,19 @@ override 'get_detailed_file_list' => sub {
 
     my $file_list = Rdiffopke::Filelist->new;
     my $dir       = Path::Class::Dir->new( $self->url )->cleanup->absolute;
-
+	my $root_path = $dir->stringify;
+	
 ## Path::Class::Dir->recurse() follows symlinks !!! ->use File::Find instead
     #    $dir->recurse(
     #        callback => sub {
-    find(
-        sub {
+    find({wanted=>       sub {
             my $stat = stat($_);
-            $file_list->add(
+			$DB::single=1;
+	    	my  $rel_path = $File::Find::name;
+			$rel_path =~ s/^$root_path\/// ; 
+            $file_list->add($rel_path,
                 Rdiffopke::File::_LocalFile->new(
+					rel_path=>$rel_path,
                     path => $File::Find::name,
                     mode => $stat->mode,
                     uid  => $stat->uid,
@@ -49,7 +53,7 @@ override 'get_detailed_file_list' => sub {
                     mtime => $stat->mtime,
                 )
             );
-        },
+        }, no_chdir=>1, follow => 0},
         $dir->stringify,
     );
 

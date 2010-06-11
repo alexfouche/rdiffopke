@@ -13,6 +13,7 @@ use Rdiffopke::SubTypes;
 use Rdiffopke::SubTypes;
 
 has 'path' =>(isa=>'Str', is=>'ro', required=>1);
+has 'rel_path' =>(isa=>'Str', is=>'ro', required=>1);
 has 'mode' =>(is=>'ro', isa=>'Any' );
 has 'uid' =>(is=>'ro', isa=>'Any' );
 has 'gid' =>(is=>'ro', isa=>'Any' );

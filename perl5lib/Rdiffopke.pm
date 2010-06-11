@@ -98,6 +98,12 @@ sub DEMOLISH {
 
 }
 
+sub compare_files {
+   my $self = shift;
+
+	$self->repository->compare_files($self->source->get_detailed_file_list);
+}
+
 no Moose;
 __PACKAGE__->meta->make_immutable;
 

@@ -6,10 +6,13 @@
 
 package Rdiffopke::Filelist;
 
-use base qw(List::Object); # Yes, that is all, just a redefinition
-
 sub new {
-	return bless List::Object->new(type=>'Rdiffopke::File');
+	return bless {};
+}
+
+sub add {
+    # my ( $self, $key, $item ) = @_;
+	$_[0]->{$_[1]} = $_[2] if ( defined($_[2])&& $_[2]->isa('Rdiffopke::File'));
 }
 
 1;

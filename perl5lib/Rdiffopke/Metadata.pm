@@ -25,7 +25,6 @@ has 'schema_version' =>
 sub BUILD {
     my $self = shift;
 
-$DB::single=1;
     if ( -e $self->dbfile ) {
         ::verbose_message("Metadata exists, checking schema version")
           if ( $self->verbose );
@@ -119,7 +118,6 @@ sub _upgrade_schema {
     ::verbose_message("Metadata schema needs upgrade, do not interrupt...")
       if ( $self->verbose );
 
-$DB::single=1;
     for ( my $i = $self->schema_version +1 ; $i <= $self->upgrade_to ; $i++ ) {
 
         try {
@@ -158,18 +156,18 @@ sub get_detailed_file_list {
 	    my $self = shift;
 
 	    my $file_list = Rdiffopke::Filelist->new;
-
+$DB::single=1;	
 		my $sql_rows;
-		try {
-			$sql_rows = $self->_dbh->selectall_arrayref( 'select file_id, paths.path, localfiles.path, owner, group, mode, mdate,  size');
-		}catch {
+		eval {
+			$sql_rows = $self->_dbh->selectall_arrayref( 'select file_id, paths.path, localfiles.path, owner, "group", mode, mdate, files.size from files, paths, localfiles where files.path_id=paths.path_id and files.localfile_id=localfiles.localfile_id;');
+		};if($@) {
 			Rdiffopke::Exception::Metadata->throw(
                 error => "An error occurred selecting file list from metadata:\n"
                   . $self->_dbh->errstr );
         };
 
-		foreach ( @sql_rows) {
-				$file_list->add(
+		foreach ( @$sql_rows) {
+				$file_list->add($_->[1],
 	                Rdiffopke::File::_LocalFile->new(
 	                    file_id => $_->[0],
 	                    orig_path => $_->[1],
@@ -179,7 +177,7 @@ sub get_detailed_file_list {
 					mode =>$_->[5],
 	   mtime => $_->[6],                  
 	 size => $_->[7],
-	                )
+	                ) );
 			}
 			
 			return  $file_list;
