@@ -18,8 +18,24 @@ subscribe_to_signals;
 # Create our program instance from supplied parameters, variables or input
 my $rdiffopke = Rdiffopke->new(get_params_and_input);
 
+# Connect to repository or create it if does not exist
+# Check repo and metadata, upgrade schema if needed
 $rdiffopke->prepare_repository;
+
+# Connect to source, do some checking
 $rdiffopke->prepare_source;
+
+# Compare files between source and repository
+# It will print some stats if verbose mode is enabled
+$rdiffopke->compare_files;
+
+# Only now we modify stuff in repository
+#$rdiffopke->create_rdiff_snapshot;
+
+# Do all report, handles close, cleanup
+$rdiffopke->terminate(0, "Terminated succesfully");
+
+exit 0;
 
 
 my $detailed_file_list = $rdiffopke->source->get_detailed_file_list;
@@ -38,11 +54,6 @@ while  ( my $file=$detailed_file_list->next ){
 
 
 
-# Do all report, handles close, cleanup
-$rdiffopke->terminate(0, "Terminated succesfully");
-
-
-exit 0;
 
 
 #

@@ -17,8 +17,8 @@ has 'upgrade_to' => ( is => 'ro', isa => 'Int', required => 1 );
 #has 'upgrade_to' => ( is => 'ro', isa => 'PositiveInt', required => 1 );  # TOFIX why is TypeConstraint not working ?
 has '_dbh'       => ( is => 'rw', isa => 'Maybe[DBI::db]' );
 has 'verbose'    => ( is => 'rw', isa => 'Int',        default  => 0 );
-has 'diff' => ( is => 'ro', isa => 'Int', writer => '_set_diff' );    # this is the current diff the metadata is dealing with
-#has 'diff' => ( is => 'ro', isa => 'PositiveInt', writer => '_set_diff' ); # TOFIX why is TypeConstraint not working ?
+has 'rdiff' => ( is => 'ro', isa => 'Int', writer => '_set_rdiff' );    # this is the current rdiff the metadata is dealing with
+#has 'rdiff' => ( is => 'ro', isa => 'PositiveInt', writer => '_set_rdiff' ); # TOFIX why is TypeConstraint not working ?
 has 'schema_version' =>
   ( is => 'ro', isa => 'Int', writer => '_set_schema_version' );
 
@@ -105,10 +105,10 @@ sub _upgrade_schema {
 
     my %db_schema_versions = (
         1 => [
-'create table diffs (diff integer primary key not null, date_begin datetime not null, date_end datetime not null, message text);',
+'create table rdiffs (rdiff integer primary key not null, date_begin datetime not null, date_end datetime not null, message text);',
 'create table options (name text primary key not null, value text);',
-'create table files (file_id integer primary key autoincrement not null, diff integer not null, path_id integer not null, localfile_id integer,
-	retrieval_date datetime not null, owner text, "group" text, mode text, mdate datetime not null, type text not null, size integer not null, target text );',
+'create table files (file_id integer primary key autoincrement not null, rdiff integer not null, path_id integer not null, localfile_id integer,
+	retrieval_date datetime not null, owner text, "group" text, mode text, mdate datetime not null, type text not null, size integer not null );',
 'create table paths (path_id integer primary key autoincrement not null, path text not null);',
 'create table localfiles (localfile_id integer primary key autoincrement not null, path text not null, size integer not null, key_id integer);',
 'create table keys ( key_id integer primary key autoincrement not null, key blob not null);',
@@ -149,9 +149,40 @@ sub set_message {
     my ( $self, $message ) = @_;
 
     $self->_dbh->do(
-        "update diffs set message = $message where diff = " . $self->diff )
-      if ( $self->diff && defined( $self->_dbh ) );
+        "update rdiffs set message = $message where rdiff = " . $self->rdiff )
+      if ( $self->rdiff && defined( $self->_dbh ) );
 
+}
+
+sub get_detailed_file_list {
+	    my $self = shift;
+
+	    my $file_list = Rdiffopke::Filelist->new;
+
+		my $sql_rows;
+		try {
+			$sql_rows = $self->_dbh->selectall_arrayref( 'select file_id, paths.path, localfiles.path, owner, group, mode, mdate,  size');
+		}catch {
+			Rdiffopke::Exception::Metadata->throw(
+                error => "An error occurred selecting file list from metadata:\n"
+                  . $self->_dbh->errstr );
+        };
+
+		foreach ( @sql_rows) {
+				$file_list->add(
+	                Rdiffopke::File::_LocalFile->new(
+	                    file_id => $_->[0],
+	                    orig_path => $_->[1],
+						path => $_->[2],
+	                   	 uid  =>$_->[3],
+					 	gid  => $_->[4],
+					mode =>$_->[5],
+	   mtime => $_->[6],                  
+	 size => $_->[7],
+	                )
+			}
+			
+			return  $file_list;
 }
 
 no Moose;

@@ -137,6 +137,28 @@ sub DEMOLISH {
     $_[0]->close;
 }
 
+sub compare_files {
+    my $self = shift;
+	
+	my $source_file_list = $self->source->get_detailed_file_list;
+	my $repo_file_list = $self->metadata->get_detailed_file_list;
+
+	$repo_file_list->rewind;
+	$source_file_list->rewind;
+
+
+
+	while  ( my $file=$detailed_file_list->next ){
+		if ($file->is_file) {
+			$file->open_r;
+			my $buf;
+			while ( my $bytes = $file->read($buf, 10)) {
+				print "$buf-----";
+			}
+		}
+
+}
+
 no Moose;
 __PACKAGE__->meta->make_immutable;
 
