@@ -22,7 +22,6 @@ has 'gid' =>(is=>'ro', isa=>'Any' );
 has 'size' =>(is=>'ro', isa=>'Int' );
 has 'mtime' =>(is=>'ro', isa=>'Int' );
 has 'type' =>(is=>'ro', isa=>'FileType', writer=>'_set_type' );
-has 'handle' => (isa=>'Maybe[FileHandle]', is=>'ro', writer=>'_create_handle');
 has 'processed' =>(is=>'ro', isa=>'Bool', writer=>'mark_as_processed' );
 
 sub BUILD {

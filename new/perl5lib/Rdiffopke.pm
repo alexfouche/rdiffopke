@@ -7,7 +7,7 @@
 package Rdiffopke;
 
 use Moose;
-#use Rdiffopke::Repository;
+use Rdiffopke::Repository;
 use Rdiffopke::FileSourceBuilder;
 use Rdiffopke::FileSource;
 
@@ -15,8 +15,8 @@ has 'no_encryption' => ( is => 'rw', isa => 'Bool', default => 0 );
 has 'verbose'       => ( is => 'rw', isa => 'Bool', default => 0 );
 has 'source'     => ( is => 'ro', isa => 'Rdiffopke::FileSource', writer=>'_set_source'  );
 has 'source_url' => ( is => 'rw', isa => 'Str' , trigger => \&_create_source);
-has 'repo_url'   => ( is => 'rw', isa => 'Str' );
-#has 'repository' => ( is => 'rw', isa => 'Rdiffopke::Repository', );
+has 'repo_url'   => ( is => 'rw', isa => 'Str', trigger => \&_create_repository );
+has 'repository' => ( is => 'ro', isa => 'Rdiffopke::Repository', writer=>'_set_repository');
 has 'version'    => ( is => 'ro', isa => 'Num', default => 0.1 );
 has 'need_metadata_schema_version' =>
   ( is => 'ro', isa => 'Int', default => 1 );
@@ -30,12 +30,44 @@ sub _create_source {
 
 sub prepare_source {
 	my $self=shift;
-#	$self->source->prepare;
+	$self->source->prepare;
 } 
 
-sub terminate {
-	
+sub _create_repository {
+	my $self=shift;
+
+	$self->_set_repository( Rdiffopke::Repository->new(url=>$self->repo_url, no_encryption=>$self->no_encryption,
+    upgrade_metadata_to => $self->need_metadata_schema_version));
 }
+
+
+sub prepare_repository {
+    my $self = shift;
+    $self->repository->prepare;
+}
+
+
+sub terminate {
+ my ( $self, $code, $message ) = @_;
+
+    $self->repository->set_message("$code - $message")
+      if ( defined($code) && defined( $self->repository ) );
+
+    $self->repository->close;
+    $self->source->close;
+   
+}
+
+sub DEMOLISH {
+    my $self = shift;
+
+   $self->repository->set_message("255 - Repository did not explicitely terminated")
+      if ( defined( $self->repository ) );
+	$self->repository->close if (defined $self->repository);
+    $self->source->close if (defined $self->source);
+   
+}
+
 
 no Moose;
 __PACKAGE__->meta->make_immutable;

@@ -13,7 +13,6 @@ use Rdiffopke::File::_LocalFile;
 use File::Find;
 use File::stat;
 
-
 extends 'Rdiffopke::FileSource';
 
 # because "after 'new'" does not work

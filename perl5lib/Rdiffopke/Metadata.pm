@@ -1,29 +1,4 @@
-###############################
-    #
-    # Class:  Rdiffopke::Metadata
-    #
-###############################
 
-    package Rdiffopke::Metadata;
-
-    use base qw(Class::Accessor::Fast );
-
-    Rdiffopke::Metadata->mk_accessors qw( error_code );
-    Rdiffopke::Metadata->mk_ro_accessors
-      qw( diff _dbh schema_version _verbose _filename);
-
-    sub new {
-        my $class  = shift;
-        my %params = @_;
-       
-        return unless ( defined $params{dir} );
-        return bless {
-            error_code => 0,
-            _verbose   => $params{verbose},
-            _filename  => "$params{dir}/metadata"
-        };
-
-    }
 
     sub init {
         my $self   = shift;
@@ -85,12 +60,7 @@
         return 1;            # Returns true
     }
 
-    sub close {
-        my $self = shift;
-        $self->_disconnect;
-        $self->error_code(0);
-    }
-
+   
     sub _connect {
         my $self = shift;
 
@@ -104,18 +74,6 @@
         return 1;    # Returns true
     }
 
-    sub _disconnect {
-        my $self = shift;
-
-        $self->_dbh->disconnect;
-        $self->{_dbh} = undef;
-        return 1;    # Returns true
-    }
-
-    sub exists {
-        my $self = shift;
-        ( -e $self->_filename ) ? 1 : 0;
-    }
 
     sub _upgrade_schema_to {
         my $self       = shift;

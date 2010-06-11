@@ -21,6 +21,7 @@ extends 'Rdiffopke::File';
 
 #has 'buffer_read_size' => (is=>'rw', isa=>'PositiveInt', default=>100*1024);
 has 'buffer_read_size' => (is=>'rw', isa=>'Int', default=>100*1024);
+has '_handle' => (isa=>'Maybe[FileHandle]', is=>'ro', writer=>'_create_handle');
 
 sub BUILD {
     my $self = shift;
@@ -34,7 +35,7 @@ sub BUILD {
         -f $self->path && do {
             $self->_set_type('file');
             $self->_create_handle( FileHandle->new );
-            unless ( defined( $self->handle ) ) {
+            unless ( defined( $self->_handle ) ) {
                 Rdiffopke::Exception::File->throw(
                         error => "Could not create handle for file "
                       . $self->path
@@ -68,7 +69,7 @@ override 'read' => sub {
               . " can not be read\n" );
     }
 
-    my $bytes = $self->handle->read( $_[1], $readsize );
+    my $bytes = $self->_handle->read( $_[1], $readsize );
     unless ( defined $bytes ) {
         Rdiffopke::Exception::File->throw(
             error => "Error reading file " . $self->path . "\n" );
@@ -80,7 +81,7 @@ override 'read' => sub {
 override 'close' => sub {
 	my $self = shift;
  
-    $self->handle->close if ( defined $self->handle );
+    $self->_handle->close if ( defined $self->_handle );
 };
 
 override 'open_r' => sub {
@@ -90,12 +91,12 @@ override 'open_r' => sub {
         Rdiffopke::Exception::File->throw( error => "The file type for file " . $self->path . " can not be opened\n" );
     };
 
-    unless ( $self->handle->open( $self->path, 'r' ) ) {
+    unless ( $self->_handle->open( $self->path, 'r' ) ) {
         Rdiffopke::Exception::File->throw(
             error => "Can not open file " . $self->path . " for reading\n" );
     };
 	
-#	$self->handle->setvbuf($buffer, _IOFBF, 0x10000);
+#	$self->_handle->setvbuf($buffer, _IOFBF, 0x10000);
 };
 
 no Moose;

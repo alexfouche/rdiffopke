@@ -26,6 +26,12 @@ sub get_detailed_file_list {
         error => "The get_detailed_file_list function should be overridden\n" );
 }
 
+sub close {}
+
+sub DEMOLISH {
+	$_[0]->close;
+}
+
 no Moose;
 __PACKAGE__->meta->make_immutable;
 

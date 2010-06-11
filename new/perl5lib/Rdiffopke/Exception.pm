@@ -28,3 +28,81 @@ use Exception::Class (
 
 1;
 
+
+__END__
+
+
+sub quit_error {
+    my ( $self, $error_code, @messages ) = @_;
+
+    my %errors = (
+        1 => "Some Perl modules are missing for rdiffopke to run.\n",
+        2 =>
+          "'$self->rdiff_dir' is neither writable nor browseable -> aborting",
+        3 =>
+"'$self->rdiff_dir' has files inside but is missing the public key file -> aborting",
+
+#        3 =>
+# "'$self->rdiff_dir' has files inside but is missing the public key file '${self->repository->userkey->filename}' -> aborting",
+        4 =>
+"You have requested no encryption but there is a public key file -> aborting",
+
+#        4 =>
+# "You have requested no encryption but there is a public key file '${self->repository->userkey->filename}' -> aborting",
+        5 =>
+"There is a metadata file  but the public key file is missing ! Set to 'no encryption' if you never used it there -> aborting",
+
+#        5 =>
+#"There is a metadata file '$self->repository->metadata->filename' but the public key file '${self->repository->userkey->filename}' is missing ! Set to 'no encryption' if you never used it there -> aborting",
+        6 =>
+"Metadata file seems to be corrupted. It should #be a SQLite database -> aborting",
+
+#        6 =>
+# "Metadata file '${self->repository->metadata->filename}' seems to be corrupted. It should #be a SQLite database -> aborting",
+        7 => "An error occurred while initializing metadata file -> aborting",
+
+#        7 =>
+#"An error occurred while initializing metadata '${self->repository->metadata->filename}' file -> aborting",
+        8 =>
+"Usage: $0 [-v] [-u <username>] [-p <password>] [-x] [-c <credentials_file>] [-i] -s <source> -d <local_destination_dir>
+
+-i read credentials from stdin
+
+-l list increments
+
+-x disable encryption
+delete increments
+
+-? size opke key
+-? size blowfish key
+-? size read buffer
+-? nb threads (default no threads)
+thorough verify
+
+
+il faudrait une option pour tout verifier
+
+Note:
+Source only support local directory or ftp:// at this time",
+        9 => "Could not read metadata version from metadata file -> aborting",
+
+#        9 =>
+# "Could not read metadata version from metadata file '$self->repository->metadata->filename' -> aborting",
+        10 => "Killed (SIGTERM)",
+        11 => "Aborted by user (SIGINT)",
+        12 => "The local rdiff '$self->rdiff_dir' is not a directory",
+        13 => "An error occurred during user key creation",
+        14 => "An error occurred while upgrading metadata schema",
+        15 =>
+"The parameter given to tell_which_files_needed() is not a Rdiffopke::Filelist instance",
+
+    );
+
+    $DB::single = 1;
+    print STDERR localtime(time) . "   $errors{$error_code}\n";
+    foreach (@messages) {
+        print STDERR localtime(time) . "   $_\n";
+    }
+
+    $self->terminate( $error_code, $errors{$error_code} );
+}

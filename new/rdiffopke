@@ -18,7 +18,9 @@ subscribe_to_signals;
 # Create our program instance from supplied parameters, variables or input
 my $rdiffopke = Rdiffopke->new(get_params_and_input);
 
+$rdiffopke->init_repository;
 $rdiffopke->prepare_source;
+
 
 my $detailed_file_list = $rdiffopke->source->get_detailed_file_list;
 
@@ -37,7 +39,7 @@ while  ( my $file=$detailed_file_list->next ){
 
 
 # Do all report, handles close, cleanup
-$rdiffopke->terminate;
+$rdiffopke->terminate(0, "Terminated succesfully");
 
 
 exit 0;
@@ -109,3 +111,58 @@ sub get_params_and_input {
     return %feed_to_rdiffopke;
 }
 
+
+
+__END__
+
+
+# TODO   parse parameters
+
+# TODO   get public key from file
+
+# TODO   connect to remote
+# TODO   do some ls test, read test on remote
+# TODO   mark as process begun
+
+# TODO   take la derniere revision de la table revision. c'est Rev-1
+# TODO   Ajoute 1 a Rev-1 et cree nouvelle revision Rev dans table revision, avec aussi la date de debut
+# TODO   update tous les items de la table filerev qui ont Rev-1 et update a Rev
+# TODO   renomme le repertoire Rev-1 en Rev
+
+# TODO   generate a blowfish 448b key for file encryption : Simkey
+# TODO   add pub(Simkey) to table sym_keys
+
+# TODO   get list of current dir content, this is %files
+# TODO   get list of known files in latest revision for this directory. this is %in_latest_rev
+# TODO   for each item in %files (including dir and symlink names)
+# TODO       encrypt all metadata for this file with public key
+# TODO       if item is in %files but not in %in_latest_rev, then
+# TODO           calculate localpath
+# TODO           calculate salted hash of file content
+# TODO           store all data to DB, but set file_rev.status to transferring
+# TODO           get the file and stream to zip and stream to encryption to disk at localpath
+# TODO           if no error, set file_rev.status to null, otherwise set as error or call reconnect and retry if just deconnected
+# TODO      else if item is in %files and in %in_latest_rev; then
+# TODO           if metadata is different ;then
+# TODO               calculate salted hash content
+# TODO               if hash content is different, then
+# TODO                    add a new entry in table files
+# TODO                    move the old file to Rev-1 local directory
+# TODO                   update all records from table  filerev which had revision 'Rev' to Rev-1
+# TODO                   write new file to current revision localpath -> have a function that get content, path, and will encrypt with Simkey
+# TODO                   add new record in table localfiles, with the id of the SimKey
+# TODO                   add metadata of the new file in table filerev with revision Rev, and id of localfiles table record
+# TODO                else  # hash content is same
+# TODO                     just add metadata of the new file in table filerev with revision Rev.
+# TODO                endif # hash content is different
+# TODO           else
+# TODO               do nothing, since nothing has changed
+# TODO           endif
+# TODO       endfor
+
+# TODO       for all items in %in_latest_rev that were not seen in previous loop  (items deleted)
+# TODO           move the old file to Rev-1 local directory
+# TODO           update all records from table  filerev which had revision 'Rev' to Rev-1
+# TODO       endfor
+
+# TODO   mark process finished
