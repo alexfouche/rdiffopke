@@ -8,13 +8,10 @@ package Rdiffopke::File::_LocalFile;
 
 use Moose;
 use FileHandle;
-use Rdiffopke::SubTypes;
 #use IO::Handle '_IOFBF';
 
 extends 'Rdiffopke::File';
 
-has 'buffer_read_size' =>( is => 'rw', isa => 'Int', default => 100 * 1024 );
-#has 'buffer_read_size' => (is=>'rw', isa=>'PositiveInt', default=>100*1024); # TOFIX why is TypeConstraint not working ?
 has '_handle' =>
   ( isa => 'Maybe[FileHandle]', is => 'ro', writer => '_create_handle' );
 
@@ -47,23 +44,22 @@ sub BUILD {
             last SWITCH;
         };
 
-# TOFIX : uncomment this. It was commented just for a test
-#        Rdiffopke::Exception::File->throw(
-#            error => "File type for file " . $self->path . " not supported\n" );
+        Rdiffopke::Exception::File->throw(
+            error => "File type for file " . $self->path . " not supported\n" );
     }
 }
 
+# Params: self, buffer, readsize
 override 'read' => sub {
     my $self = $_[0]
       ; # Do not modify @_, to use the trick at http://stackoverflow.com/questions/3011653/what-is-the-magic-behind-perl-read-function-and-buffer-which-is-not-a-ref
     my $readsize = $_[2];
 
-    $readsize = $self->buffer_read_size unless ( defined $readsize );
+    $readsize = 100*1024 unless ( defined $readsize );
 
-    unless ( $self->type eq 'file' ) {
-        Rdiffopke::Exception::File->throw( error => "The file type for file "
-              . $self->path
-              . " can not be read\n" );
+   unless ( defined $self->_handle ) {
+        Rdiffopke::Exception::File->throw(
+            error => "File handle not defined for '" . $self->path . "' \n" );
     }
 
     my $bytes = $self->_handle->read( $_[1], $readsize );
@@ -84,15 +80,15 @@ override 'close' => sub {
 override 'open_r' => sub {
     my $self = shift;
 
-    unless ( $self->type eq 'file' ) {
-        Rdiffopke::Exception::File->throw( error => "The file type for file "
+    unless ( $self->is_file) {
+        Rdiffopke::Exception::File->throw( error => "The file type for file '"
               . $self->path
-              . " can not be opened\n" );
+              . "' can not be opened\n" );
     }
 
     unless ( $self->_handle->open( $self->path, 'r' ) ) {
         Rdiffopke::Exception::File->throw(
-            error => "Can not open file " . $self->path . " for reading\n" );
+            error => "Can not open file '" . $self->path . "' for reading\n" );
     }
 
     #	$self->_handle->setvbuf($buffer, _IOFBF, 0x10000);

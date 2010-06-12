@@ -24,6 +24,7 @@ has 'repository' =>
 has 'version' => ( is => 'ro', isa => 'Num', default => 0.1 );
 has 'need_metadata_schema_version' =>
   ( is => 'ro', isa => 'Int', default => 1 );
+#has '_source_file_list' =>( is => 'ro', isa => 'Rdiffopke::FileList' );
 
 sub BUILD {
     my $self = shift;
@@ -36,6 +37,7 @@ sub BUILD {
                 need_metadata_schema_version =>
                   $self->need_metadata_schema_version,
 				verbose => $self->verbose,
+				source_url => $self->source_url,   # For informational purposes only, but required
             }
           )->instance
     );
@@ -101,7 +103,18 @@ sub DEMOLISH {
 sub compare_files {
    my $self = shift;
 
-	$self->repository->compare_files($self->source->get_detailed_file_list);
+#	$self->_source_file_list($self->source->get_detailed_file_list);
+#	$self->repository->compare_files($self->_source_file_list);
+	$self->repository->compare_files($self->source->get_detailed_file_list); # Since the compare_files() will generate lists which are in facts lists of instances of the source Rdiffopke::File, we do not need to keep the detailed file list from source
+}
+
+sub transfer_files{
+	 my $self = shift;
+
+#		$self->repository->transfer_files($self->_source_file_list);
+$self->repository->transfer_files ; # Since the compare_files() will generate lists which are in facts lists of instances of the source Rdiffopke::File, we do not need to keep the detailed file list from source
+	}
+	
 }
 
 no Moose;

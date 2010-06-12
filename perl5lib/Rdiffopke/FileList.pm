@@ -15,4 +15,8 @@ sub add {
 	$_[0]->{$_[1]} = $_[2] if ( defined($_[2])&& $_[2]->isa('Rdiffopke::File'));
 }
 
+sub delete{
+	delete $_[0]->{$_[1]};
+}
+
 1;

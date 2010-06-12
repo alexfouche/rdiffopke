@@ -13,17 +13,19 @@ use Rdiffopke::SubTypes;
 use Rdiffopke::SubTypes;
 use Rdiffopke::Exception;
 
-has 'path' =>(isa=>'Str', is=>'ro', required=>1);
-has 'rel_path' =>(isa=>'Str', is=>'ro', required=>1);
+has 'path' =>(isa=>'Str', is=>'ro', required=>1); # path is the full path/url to locate the file on the medium, whichever it is source or repository
+has 'rel_path' =>(isa=>'Str', is=>'ro', required=>1); # rel_path is the relative path in the source
 has 'mode' =>(is=>'ro', isa=>'Any' );
 has 'uid' =>(is=>'ro', isa=>'Any' );
 has 'gid' =>(is=>'ro', isa=>'Any' );
 has 'size' =>(is=>'ro', isa=>'Int' );
-has 'mtime' =>(is=>'ro', isa=>'Int' );
+has 'mtime' =>(is=>'ro', isa=>'Any' );
 has 'type' =>(is=>'ro', isa=>'Str', writer=>'_set_type' ); # TOFIX why is TypeConstraint not working ?
 #has 'type' =>(is=>'ro', isa=>'Rdiffopke::FileType', writer=>'_set_type' ); # TOFIX why is TypeConstraint not working ?
 has 'processed' =>(is=>'ro', isa=>'Bool', writer=>'mark_as_processed' );
 has 'verbose' => (is=>'rw', isa =>'Int', default=>0);
+has 'file_id' =>(is=>'ro', isa=>'Any' );
+
 
 sub BUILD {
 	my $self = shift;

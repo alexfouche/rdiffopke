@@ -58,6 +58,10 @@ override 'get_detailed_file_list' => sub {
         $dir->stringify,
     );
 
+	# Make sure we do not include the base directory
+	$file_list->delete('.');
+	$file_list->delete($dir);
+
     return $file_list;
 };
 

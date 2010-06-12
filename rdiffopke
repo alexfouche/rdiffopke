@@ -30,25 +30,13 @@ $rdiffopke->prepare_source;
 $rdiffopke->compare_files;
 
 # Only now we modify stuff in repository
-#$rdiffopke->create_rdiff_snapshot;
+$rdiffopke->transfer_files;
 
 # Do all report, handles close, cleanup
 $rdiffopke->terminate(0, "Terminated succesfully");
 
 exit 0;
 
-
-my $detailed_file_list = $rdiffopke->source->get_detailed_file_list;
-
-$detailed_file_list->rewind;
-while  ( my $file=$detailed_file_list->next ){
-	if ($file->is_file) {
-		$file->open_r;
-		my $buf;
-		while ( my $bytes = $file->read($buf, 10)) {
-			print "$buf-----";
-		}
-	}
 	
 }
 
