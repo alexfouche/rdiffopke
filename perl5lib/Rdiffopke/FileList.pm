@@ -4,7 +4,7 @@
 #
 ###############################
 
-package Rdiffopke::Filelist;
+package Rdiffopke::FileList;
 
 sub new {
 	return bless {};

@@ -46,8 +46,10 @@ sub BUILD {
             $self->_set_type('slink');
             last SWITCH;
         };
-        Rdiffopke::Exception::File->throw(
-            error => "File type for file " . $self->path . " not supported\n" );
+
+# TOFIX : uncomment this. It was commented just for a test
+#        Rdiffopke::Exception::File->throw(
+#            error => "File type for file " . $self->path . " not supported\n" );
     }
 }
 

@@ -10,6 +10,7 @@ use Moose;
 use Rdiffopke::FileList;
 use Path::Class::Dir;
 use Rdiffopke::File::_LocalFile;
+use Rdiffopke::Exception;
 use File::Find;
 use File::stat;
 
@@ -28,7 +29,7 @@ sub BUILD {
 override 'get_detailed_file_list' => sub {
     my $self = shift;
 
-    my $file_list = Rdiffopke::Filelist->new;
+    my $file_list = Rdiffopke::FileList->new;
     my $dir       = Path::Class::Dir->new( $self->url )->cleanup->absolute;
 	my $root_path = $dir->stringify;
 	

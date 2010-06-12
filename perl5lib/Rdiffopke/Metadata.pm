@@ -155,7 +155,7 @@ sub set_message {
 sub get_detailed_file_list {
 	    my $self = shift;
 
-	    my $file_list = Rdiffopke::Filelist->new;
+	    my $file_list = Rdiffopke::FileList->new;
 $DB::single=1;	
 		my $sql_rows;
 		eval {

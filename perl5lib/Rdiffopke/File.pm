@@ -11,6 +11,7 @@ use FileHandle;
 use Rdiffopke::SubTypes;
 #use namespace::autoclean; # because attribute 'type' and its accessors conflict with method 'type' of Moose::Util::TypeConstraints
 use Rdiffopke::SubTypes;
+use Rdiffopke::Exception;
 
 has 'path' =>(isa=>'Str', is=>'ro', required=>1);
 has 'rel_path' =>(isa=>'Str', is=>'ro', required=>1);
@@ -19,7 +20,8 @@ has 'uid' =>(is=>'ro', isa=>'Any' );
 has 'gid' =>(is=>'ro', isa=>'Any' );
 has 'size' =>(is=>'ro', isa=>'Int' );
 has 'mtime' =>(is=>'ro', isa=>'Int' );
-has 'type' =>(is=>'ro', isa=>'Rdiffopke::FileType', writer=>'_set_type' );
+has 'type' =>(is=>'ro', isa=>'Str', writer=>'_set_type' ); # TOFIX why is TypeConstraint not working ?
+#has 'type' =>(is=>'ro', isa=>'Rdiffopke::FileType', writer=>'_set_type' ); # TOFIX why is TypeConstraint not working ?
 has 'processed' =>(is=>'ro', isa=>'Bool', writer=>'mark_as_processed' );
 has 'verbose' => (is=>'rw', isa =>'Int', default=>0);
 
