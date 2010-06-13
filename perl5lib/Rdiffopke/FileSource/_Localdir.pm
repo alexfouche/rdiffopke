@@ -38,7 +38,6 @@ override 'get_detailed_file_list' => sub {
     #        callback => sub {
     find({wanted=>       sub {
             my $stat = stat($_);
-			$DB::single=1;
 	    	my  $rel_path = $File::Find::name;
 			$rel_path =~ s/^$root_path\/// ; 
             $file_list->add($rel_path,

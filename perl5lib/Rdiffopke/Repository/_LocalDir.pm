@@ -38,7 +38,7 @@ before 'prepare' => sub {
 
     ::verbose_message(
         "Checking and initializing rdiff repository '" . $self->url . "'" )
-      if ( $self->verbose );
+      if ( $Rdiffopke::verbose );
 
     if ( -e $self->url && !-d $self->url ) {
         Rdiffopke::Exception::Repository->throw(
@@ -146,25 +146,26 @@ override '_discard_file' => sub {
     }
 
     # First we recreate the original arborescence in the previous rdiff dir
-    my $file_name = file( $file->rel_path );
-    my $base_dir =
-      dir(  $self->url 
+   my $file_name = file( $self->url 
           . "/data/"
-          . $self->metadata->rdiff . '/'
-          . $file_name->dir->stringify );
-    my $prev_base_dir =
-      dir(  $self->url 
-          . "/data/"
-          . $self->metadata->prev_rdiff . '/'
-          . $file_name->dir->stringify );
+          . $self->metadata->rdiff . '/' . $file->rel_path );
+    # my $base_dir =
+    #  dir(  $self->url 
+    #      . "/data/"
+    #      . $self->metadata->rdiff . '/'
+    #      . $file_name->dir->stringify );
+	my $base_dir = $file_name->dir;
+    my $prev_base_dir =dir( $self->url       . "/data/" . $self->metadata->prev_rdiff . '/' . file($file->rel_path)->dir );
     $prev_base_dir->mkpath;
+
+	# Maybe the file does not exists if it is new 
+	if (! -f $file_name) { return;}
+
+$DB::single=1;
 
 # Build absolute path of file in repository and move it from current rdiff to previous rdiff
     unless (
-        move(
-            "$base_dir/" . $file_name->basename,
-            "$prev_base_dir/" . $file_name->basename
-        )
+        move(  "$base_dir/" . $file_name->basename,     "$prev_base_dir/" . $file_name->basename )
       )
     {
         Rdiffopke::Exception::Repository->throw(
@@ -178,8 +179,7 @@ override '_discard_file' => sub {
 # See the Rdiffopke::Repository::... description in base class
 override '_transfer_file' => sub {
     my $self = shift;
-    my $sfile =
-      shift;    # Should be a Rdiffopke::File representing the source file
+    my $sfile =  shift;    # Should be a Rdiffopke::File representing the source file
 
     unless ( $sfile->is_file ) {
         Rdiffopke::Exception::Repository->throw( error =>
@@ -188,36 +188,52 @@ override '_transfer_file' => sub {
     }
 
     # First we recreate the original arborescence
-    my $rfile_name = file( $sfile->rel_path );
-    my $base_dir =
-      dir(  $self->url 
+	my $rfile_rel_path = $sfile->rel_path;
+    my $rfile = file($self->url 
           . "/data/"
-          . $self->metadata->rdiff . '/'
-          . $rfile_name->dir->stringify );
+          . $self->metadata->rdiff . '/' . $sfile->rel_path );
+    #my $base_dir =
+    #  dir(  $self->url 
+    #      . "/data/"
+    #      . $self->metadata->rdiff . '/'
+    #      . $rfile_name->dir->stringify );
+	my $base_dir = $rfile->dir;
     $base_dir->mkpath;
 
-    # $rfile will be the repository file written
-    my $rfile = FileHandle->new( ">$base_dir/" . $rfile_name->basename );
-    unless ( defined $rfile ) {
+	# From now, $sfile is Rdiffopke::File, $rfile is Path::Class::File, and $rfile_h is FileHandle 
+
+    # $rfile_h will be the repository file written
+    my $rfile_h = FileHandle->new( ">$base_dir/" . $rfile->basename );
+    unless ( defined $rfile_h ) {
         Rdiffopke::Exception::Repository->throw(
             error => "Can not create file in repository\n" );
     }
 
-# Why don't we use File::Copy ? Because source file can come fron anywhere, not only local filesystem
+# Why don't we use File::Copy ? Because source file can come from anywhere, not only local filesystem, this is the reason the Rdiffopke::File virtual object exists
     $sfile->open_r;
     my $buffer;
     while ( $sfile->read($buffer) ) {
-        unless ( print $rfile $buffer ) {
+        unless ( print $rfile_h $buffer ) {
             Rdiffopke::Exception::Repository->throw(
                     error => "Error while writing to file '"
                   . "$base_dir/"
-                  . $rfile_name->basename
+                  . $rfile->basename
                   . "' in repository\n" );
         }
 
     }
     $sfile->close;
-    $rfile->close;
+    $rfile_h->close;
+	
+	my $stat = $rfile->stat;
+	# returns a small array [localpath, 'mtime', 'size'] of the file stored in the repository
+	    return [$rfile_rel_path, $stat->mtime, $stat->size];
+};
+
+# Verify parts that are relevant to specific implementation of repository
+override '_verify' => sub {
+   my $self = shift;
+
 };
 
 no Moose;

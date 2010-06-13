@@ -23,7 +23,6 @@ has 'mtime' =>(is=>'ro', isa=>'Any' );
 has 'type' =>(is=>'ro', isa=>'Str', writer=>'_set_type' ); # TOFIX why is TypeConstraint not working ?
 #has 'type' =>(is=>'ro', isa=>'Rdiffopke::FileType', writer=>'_set_type' ); # TOFIX why is TypeConstraint not working ?
 has 'processed' =>(is=>'ro', isa=>'Bool', writer=>'mark_as_processed' );
-has 'verbose' => (is=>'rw', isa =>'Int', default=>0);
 has 'file_id' =>(is=>'ro', isa=>'Any' );
 
 

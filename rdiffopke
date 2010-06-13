@@ -22,6 +22,9 @@ my $rdiffopke = Rdiffopke->new(get_params_and_input);
 # Check repo and metadata, upgrade schema if needed
 $rdiffopke->prepare_repository;
 
+# Do a complete consistency check of repository
+$rdiffopke->verify_repository if ($rdiffopke->need_verify_repo);
+
 # Connect to source, do some checking
 $rdiffopke->prepare_source;
 
@@ -36,9 +39,6 @@ $rdiffopke->transfer_files;
 $rdiffopke->terminate(0, "Terminated succesfully");
 
 exit 0;
-
-	
-}
 
 
 
@@ -101,11 +101,12 @@ sub get_params_and_input {
             error => "Missing some required command line parameters\n" );
     }
 
-    my %feed_to_rdiffopke = ();
-    $feed_to_rdiffopke{verbose}        = 1             if ( $getopts->{v} );
+    my %feed_to_rdiffopke = (verbose=>0);
+    $feed_to_rdiffopke{verbose}        ++             if ( $getopts->{v} );
     $feed_to_rdiffopke{no_encryption}  = 1             if ( $getopts->{x} );
     $feed_to_rdiffopke{source_url}     = $getopts->{s} if ( $getopts->{s} );
     $feed_to_rdiffopke{repo_url} = $getopts->{d} if ( $getopts->{d} );
+  $feed_to_rdiffopke{need_verify_repo}  = 1             if ( $getopts->{t} );
 
     return %feed_to_rdiffopke;
 }
