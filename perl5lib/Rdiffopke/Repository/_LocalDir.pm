@@ -11,6 +11,7 @@ use Rdiffopke::Exception;
 use File::Copy;
 use Path::Class;
 use FileHandle;
+use Try::Tiny;
 
 extends 'Rdiffopke::Repository';
 
@@ -98,11 +99,21 @@ override '_get_metadata_dbfile' => sub {
 override '_move_files_to_last_rdiff' => sub {
     my $self = shift;
 
+	dir($self->url ,'data')->mkpath;
+
+	# Create a symlink for convenience if users want to browse the repository. Some platforms do not support symlinks
+	    try {
+	        unlink( file($self->url ,'latest_rdiff' )->stringify);
+	        unlink( file($self->url ,'data','_latest_rdiff')->stringify );
+	        symlink (file('data' , $self->metadata->rdiff)->stringify, file($self->url ,'latest_rdiff')->stringify);
+	        symlink ( $self->metadata->rdiff, file($self->url ,'data','_latest_rdiff')->stringify);
+	    };
+
     # nothing to do if the previous rdiff is 0 (the repository is new)
     return if ( $self->metadata->prev_rdiff == 0 );
 
-    my $prev_rdiff_dir = $self->url . "/data/" . $self->metadata->prev_rdiff;
-    my $rdiff_dir      = $self->url . "/data/" . $self->metadata->rdiff;
+    my $prev_rdiff_dir = dir($self->url ,'data' , $self->metadata->prev_rdiff)->stringify;
+    my $rdiff_dir      = dir($self->url ,'data', $self->metadata->rdiff)->stringify;
 
 # Fail if there is already a directory named after the current(new) rdiff number
     if ( -d $rdiff_dir ) {
@@ -123,15 +134,6 @@ override '_move_files_to_last_rdiff' => sub {
 "Can not rename '$rdiff_dir' should not already exist in the repository\n"
         );
     }
-
-# Create a symlink for convenience if users want to browse the repository. Some platforms do not support symlinks
-    try {
-        unlink( $self->url . "/latest_rdiff" );
-        unlink( $self->url . "/data/_latest_rdiff" );
-        symlink "/data/" . $self->metadata->rdiff, $self->url . "/latest_rdiff";
-        symlink "/data/" . $self->metadata->rdiff,
-          $self->url . "/data/_latest_rdiff";
-    };
 };
 
 # See the Rdiffopke::Repository::... description in base class
@@ -146,26 +148,22 @@ override '_discard_file' => sub {
     }
 
     # First we recreate the original arborescence in the previous rdiff dir
-   my $file_name = file( $self->url 
-          . "/data/"
-          . $self->metadata->rdiff . '/' . $file->rel_path );
+   my $file_name = file( $self->url ,'data',$self->metadata->rdiff , $file->rel_path ); # Use ',' construction to make it portable
     # my $base_dir =
-    #  dir(  $self->url 
-    #      . "/data/"
-    #      . $self->metadata->rdiff . '/'
-    #      . $file_name->dir->stringify );
+    #  dir(  $self->url ,
+    #      'data',
+    #       $self->metadata->rdiff ,
+    #       $file_name->dir->stringify ); # Use ',' construction to make it portable
 	my $base_dir = $file_name->dir;
-    my $prev_base_dir =dir( $self->url       . "/data/" . $self->metadata->prev_rdiff . '/' . file($file->rel_path)->dir );
+    my $prev_base_dir =dir( $self->url ,'data', $self->metadata->prev_rdiff , file($file->rel_path)->dir ); # Use ',' construction to make it portable
     $prev_base_dir->mkpath;
 
 	# Maybe the file does not exists if it is new 
 	if (! -f $file_name) { return;}
 
-$DB::single=1;
-
 # Build absolute path of file in repository and move it from current rdiff to previous rdiff
     unless (
-        move(  "$base_dir/" . $file_name->basename,     "$prev_base_dir/" . $file_name->basename )
+        move(  file("$base_dir", $file_name->basename),   file("$prev_base_dir", $file_name->basename)  )
       )
     {
         Rdiffopke::Exception::Repository->throw(
@@ -189,9 +187,7 @@ override '_transfer_file' => sub {
 
     # First we recreate the original arborescence
 	my $rfile_rel_path = $sfile->rel_path;
-    my $rfile = file($self->url 
-          . "/data/"
-          . $self->metadata->rdiff . '/' . $sfile->rel_path );
+    my $rfile = file($self->url, 'data', $self->metadata->rdiff ,  $sfile->rel_path ); # Use ',' construction to make it portable
     #my $base_dir =
     #  dir(  $self->url 
     #      . "/data/"
@@ -203,7 +199,7 @@ override '_transfer_file' => sub {
 	# From now, $sfile is Rdiffopke::File, $rfile is Path::Class::File, and $rfile_h is FileHandle 
 
     # $rfile_h will be the repository file written
-    my $rfile_h = FileHandle->new( ">$base_dir/" . $rfile->basename );
+    my $rfile_h = FileHandle->new( '>' .file($base_dir, $rfile->basename)->stringify );
     unless ( defined $rfile_h ) {
         Rdiffopke::Exception::Repository->throw(
             error => "Can not create file in repository\n" );
@@ -216,8 +212,7 @@ override '_transfer_file' => sub {
         unless ( print $rfile_h $buffer ) {
             Rdiffopke::Exception::Repository->throw(
                     error => "Error while writing to file '"
-                  . "$base_dir/"
-                  . $rfile->basename
+                  . file($base_dir, $rfile->basename)->stringify
                   . "' in repository\n" );
         }
 

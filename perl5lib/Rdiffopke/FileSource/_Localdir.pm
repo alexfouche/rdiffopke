@@ -8,7 +8,7 @@ package Rdiffopke::FileSource::_LocalDir;
 
 use Moose;
 use Rdiffopke::FileList;
-use Path::Class::Dir;
+use Path::Class;
 use Rdiffopke::File::_LocalFile;
 use Rdiffopke::Exception;
 use File::Find;
@@ -30,19 +30,21 @@ override 'get_detailed_file_list' => sub {
     my $self = shift;
 
     my $file_list = Rdiffopke::FileList->new;
-    my $dir       = Path::Class::Dir->new( $self->url )->cleanup->absolute;
-	my $root_path = $dir->stringify;
+    my $dir       = dir( $self->url )->cleanup->absolute;
+	# my $root_path = $dir->stringify;
 	
 ## Path::Class::Dir->recurse() follows symlinks !!! ->use File::Find instead
     #    $dir->recurse(
     #        callback => sub {
     find({wanted=>       sub {
             my $stat = stat($_);
-	    	my  $rel_path = $File::Find::name;
-			$rel_path =~ s/^$root_path\/// ; 
+			my  $rel_path = file($File::Find::name)->relative($dir);
+			# my $rel_path = $File::Find::name;
+			# $rel_path =~ s/^$root_path\/// ;   # Not portable
+			
             $file_list->add($rel_path,
                 Rdiffopke::File::_LocalFile->new(
-					rel_path=>$rel_path,
+					rel_path=>$rel_path->stringify,
                     path => $File::Find::name,
                     mode => $stat->mode,
                     uid  => $stat->uid,

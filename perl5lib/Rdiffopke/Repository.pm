@@ -170,6 +170,8 @@ sub compare_files {
         );
     }
 
+$DB::single=1;
+
 # I suppose if lists are big, it is better to use directly variables instead of accessors
 
     my $repo_file_list = $self->metadata->get_detailed_file_list;

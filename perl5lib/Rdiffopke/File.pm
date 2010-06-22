@@ -13,7 +13,7 @@ use Rdiffopke::SubTypes;
 use Rdiffopke::SubTypes;
 use Rdiffopke::Exception;
 
-has 'path' =>(isa=>'Str', is=>'ro', required=>1); # path is the full path/url to locate the file on the medium, whichever it is source or repository
+has 'path' =>(isa=>'Maybe[Str]', is=>'ro', required=>1); # path is the full path/url to locate the file on the medium, whichever it is source or repository
 has 'rel_path' =>(isa=>'Str', is=>'ro', required=>1); # rel_path is the relative path in the source
 has 'mode' =>(is=>'ro', isa=>'Any' );
 has 'uid' =>(is=>'ro', isa=>'Any' );

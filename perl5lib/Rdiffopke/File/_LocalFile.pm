@@ -18,7 +18,8 @@ has '_handle' =>
 sub BUILD {
     my $self = shift;
 
-    unless ( $self->path ) {
+unless ( defined($self->{type} ) && ($self->{type} eq 'file' || $self->{type} eq 'dir' || $self->{type} eq 'slink')){
+    unless ( -e $self->path ) {
         Rdiffopke::Exception::File->throw(
             error => "File " . $self->path . "is not readable\n" );
     }
@@ -47,6 +48,7 @@ sub BUILD {
         Rdiffopke::Exception::File->throw(
             error => "File type for file " . $self->path . " not supported\n" );
     }
+}
 }
 
 # Params: self, buffer, readsize

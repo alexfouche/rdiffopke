@@ -184,7 +184,7 @@ sub _upgrade_schema {
 'create table rdiffs (rdiff integer primary key not null, date_begin datetime not null, date_end datetime not null, message text);',
 'create table options (name text primary key not null, value text);',
 'create table files (file_id integer primary key autoincrement not null, rdiff integer not null, path_id integer not null, localfile_id integer,
-	retrieval_date datetime not null, owner text, "group" text, mode text, mtime datetime not null, type text not null, size integer not null );',
+	retrieval_date datetime not null, uid text, gid text, mode text, mtime datetime not null, type text not null, size integer not null );',
 'create table paths (path_id integer primary key autoincrement not null, path text not null);',
 'create table localfiles (localfile_id integer primary key autoincrement not null, path text not null, mtime datetime not null, size integer not null, key_id integer);',
 'create table keys ( key_id integer primary key autoincrement not null, key blob not null);',
@@ -223,12 +223,11 @@ sub _upgrade_schema {
 sub set_message {
     my ( $self, $message ) = @_;
 
-$DB::single=1;
-    eval {
+    try {
         $self->_dbh->do( "update rdiffs set message = '$message' where rdiff = "
               . $self->rdiff )
           if ( $self->rdiff && defined( $self->_dbh ) );
-    }; if($@) {
+    }catch {
         Rdiffopke::Exception::Metadata->throw(
             error => "An error occurred while setting message to metadata:\n"
               . $self->_dbh->errstr );
@@ -242,19 +241,22 @@ sub get_detailed_file_list {
     my $rdiff = $self->rdiff;
 
     my $file_list = Rdiffopke::FileList->new;
-    my $sql_rows;
-    try {
-        $sql_rows = $self->_dbh->selectall_arrayref(
-"select file_id, paths.path, localfiles.path, owner, 'group', mode, files.mtime, files.size from files, paths, localfiles where rdiff=$rdiff and files.path_id=paths.path_id and files.localfile_id=localfiles.localfile_id;"
+    my ($sql_rows_files, $sql_rows_others);
+    eval {
+	    # All the files (has a join on table 'localfiles')
+        $sql_rows_files = $self->_dbh->selectall_arrayref(
+"select file_id, paths.path, localfiles.path, uid, gid, mode, files.mtime, files.size, type from files, paths, localfiles where rdiff=$rdiff and files.path_id=paths.path_id and files.localfile_id=localfiles.localfile_id and files.type = 'file' ;");
+        $sql_rows_others = $self->_dbh->selectall_arrayref(
+"select file_id, paths.path, null, uid, gid, mode, files.mtime, files.size, type from files, paths 
+where rdiff=$rdiff and files.path_id=paths.path_id and files.type != 'file' ;"
         );
-    }
-    catch {
+    };if($@) {
         Rdiffopke::Exception::Metadata->throw(
             error => "An error occurred selecting file list from metadata:\n"
               . $self->_dbh->errstr );
     };
 
-    foreach (@$sql_rows) {
+    foreach (@$sql_rows_files, @$sql_rows_others) {
         $file_list->add(
             $_->[1],
             Rdiffopke::File::_LocalFile->new(
@@ -267,6 +269,7 @@ sub get_detailed_file_list {
                 mode  => $_->[5],
                 mtime => $_->[6],
                 size  => $_->[7],
+				type  => $_->[8],
             )
         );
     }
@@ -303,7 +306,7 @@ sub _discard_file_metadata {
 	if(!defined $file_id){ return;}
 
     # Update the record to belong to previous revision
-    $self->_dbh->do( "update files set rdiff=" . $self->prev_rdiff    . ", owner='" . $file->uid . "', 'group'='"  . $file->gid   . "', mode='"  . $file->mode     . "', mtime='" . $file->mtime  . "', type='"   . $file->type  . "', size="    . $file->size . " where file_id=$file_id;"
+    $self->_dbh->do( "update files set rdiff=" . $self->prev_rdiff    . ", uid='" . $file->uid . "', gid='"  . $file->gid   . "', mode='"  . $file->mode     . "', mtime='" . $file->mtime  . "', type='"   . $file->type  . "', size="    . $file->size . " where file_id=$file_id;"
 	 );
 
     return $path_id;
@@ -337,8 +340,6 @@ sub _add_file_metadata {
         }
     }
 
-
-$DB::single=1;
 	# We are given a 'localfiles' table record structure, let's create it and put the reference in the 'files' record
     my $localfile_id;
     if ( defined $localfile ) {
@@ -367,7 +368,7 @@ $DB::single=1;
 
 
     $self->_dbh->do(
-"insert into files(rdiff, path_id, $localfile_id_string1 owner, 'group', mode, mtime, type, size, retrieval_date) values("
+"insert into files(rdiff, path_id, $localfile_id_string1 uid, gid, mode, mtime, type, size, retrieval_date) values("
           . $self->rdiff . ","
           . $path_id
           . ", $localfile_id_string2 " . "'"
@@ -385,7 +386,6 @@ sub discard_file {
     my $self = shift;
     my $file = shift;    # Should be a Rdiffopke::File
 
-$DB::single=1;
     eval {
         $self->_dbh->begin_work;
 
@@ -433,7 +433,6 @@ sub add_file {
     my $localfile =
       shift;    # localfile is a small array [localpath, 'mtime', 'size']
 
-$DB::single=1;
     eval {
         $self->_dbh->begin_work;
 
