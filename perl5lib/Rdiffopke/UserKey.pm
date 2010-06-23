@@ -1,10 +1,10 @@
 ###############################
 #
-# Class:  Rdiffopke::Userkey
+# Class:  Rdiffopke::UserKey
 #
 ###############################
 
-package Rdiffopke::Userkey;
+package Rdiffopke::UserKey;
 
 use Moose;
 use Rdiffopke::Exception;

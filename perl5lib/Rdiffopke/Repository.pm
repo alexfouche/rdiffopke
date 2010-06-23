@@ -169,11 +169,8 @@ sub compare_files {
 "Function 'compare_files' needs to be given a FileList instance of the files on the source\n"
         );
     }
-
 $DB::single=1;
-
 # I suppose if lists are big, it is better to use directly variables instead of accessors
-
     my $repo_file_list = $self->metadata->get_detailed_file_list;
 
     my @list_files_to_transfer          = ();
@@ -194,6 +191,7 @@ $DB::single=1;
               )
             {
                 push( @list_files_to_transfer, $source_file_list->{$_} );
+  				$repo_file_list->{$_}->{processed} = 1;
                 next;
             }
             push( @list_files_to_update_metadata, $source_file_list->{$_} )
@@ -210,6 +208,7 @@ $DB::single=1;
             push @list_files_to_transfer, $source_file_list->{$_};
         }
     }
+
     push( @list_files_to_discard_from_repo, $repo_file_list->{$_} ) foreach (
         grep { !$repo_file_list->{$_}->{processed} }
         keys(%$repo_file_list)
@@ -275,8 +274,7 @@ sub transfer_files {
     foreach ( @{ $self->list_files_to_transfer } ) {
         $self->metadata->discard_file($_)
           ;    # push modified metadata and file content to previous rdiff
-        $self->_discard_file($_)
-          if ( $_->is_file );    # push repository file to previous rdiff folder
+        $self->_discard_file($_); # if ( $_->is_file );    # push repository file to previous rdiff folder
 
 # $localfile is a small array [localpath, 'mtime', 'size'] of the file stored in the repository
         my $localfile = $self->_transfer_file($_)
@@ -303,8 +301,7 @@ sub transfer_files {
     foreach ( @{ $self->list_files_to_discard_from_repo } ) {
         $self->metadata->discard_file($_)
           ;    # push modified metadata to previous rdiff
-        $self->_discard_file($_)
-          if ( $_->is_file );    # push repository file to previous rdiff folder
+        $self->_discard_file($_); # if ( $_->is_file );    # push repository file to previous rdiff folder
     }
     $self->_set_list_files_to_discard_from_repo( [] );    # can't hurt
 

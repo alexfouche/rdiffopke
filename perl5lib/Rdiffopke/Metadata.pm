@@ -285,11 +285,10 @@ sub _discard_file_metadata {
 
     my ( $file_id, $path_id );
     if ( defined $file->file_id ) {
-        $file_id = $self->file_id;
+        $file_id = $file->file_id;
 
         # We need to return the path_id
-        $path_id = $self->_dbh->selectrow_array(
-            'select path_id from files where file_id=' . $file->file_id . ';' );
+        $path_id = $self->_dbh->selectrow_array("select path_id from files where file_id=$file_id;" );
     }
     else {
 

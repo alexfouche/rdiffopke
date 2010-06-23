@@ -123,17 +123,26 @@ override '_move_files_to_last_rdiff' => sub {
     }
 
     # Fail if the previous rdiff directory is missing
-    unless ( -d $prev_rdiff_dir ) {
-        Rdiffopke::Exception::Repository->throw( error =>
-"Previous rdiff directory '$prev_rdiff_dir' is missing from the repository\n"
-        );
-    }
+#    unless ( -d $prev_rdiff_dir ) {
+#        Rdiffopke::Exception::Repository->throw( error => "Previous rdiff directory '$prev_rdiff_dir' is missing from the repository\n" );
+#    }
+#
+# In fact there are cases when the previous rdiff_dir can be missing if the source directory was empty(ed)
 
+if ( -d $prev_rdiff_dir ) {
     unless ( rename $prev_rdiff_dir, $rdiff_dir ) {
         Rdiffopke::Exception::Repository->throw( error =>
 "Can not rename '$rdiff_dir' should not already exist in the repository\n"
         );
     }
+};
+# else {
+#	 unless ( mkdir $rdiff_dir ) {
+#	        Rdiffopke::Exception::Repository->throw( error =>
+#	"Can not create '$rdiff_dir'\n"
+#	        );
+#	    }
+#}
 };
 
 # See the Rdiffopke::Repository::... description in base class
@@ -141,25 +150,21 @@ override '_discard_file' => sub {
     my $self = shift;
     my $file = shift;    # Should be a Rdiffopke::File
 
-    unless ( $file->is_file ) {
-        Rdiffopke::Exception::Repository->throw( error =>
-"Can not discard other file types than 'file' from the repository:\n"
-        );
-    }
+# Commented because $file is the source file, and it might be a directory, while it was previously a file (and so is a file in the repository)
+#    unless ( $file->is_file ) {
+#        Rdiffopke::Exception::Repository->throw( error =>"Can not discard other file types than 'file' from the repository:\n" );
+#    }
+
+    my $file_name = file( $self->url ,'data',$self->metadata->rdiff , $file->rel_path ); # Use ',' construction to make it portable
+
+	# Maybe the file does not exists if it is new 
+	if (! -f $file_name) { return;}
 
     # First we recreate the original arborescence in the previous rdiff dir
-   my $file_name = file( $self->url ,'data',$self->metadata->rdiff , $file->rel_path ); # Use ',' construction to make it portable
-    # my $base_dir =
-    #  dir(  $self->url ,
-    #      'data',
-    #       $self->metadata->rdiff ,
-    #       $file_name->dir->stringify ); # Use ',' construction to make it portable
 	my $base_dir = $file_name->dir;
     my $prev_base_dir =dir( $self->url ,'data', $self->metadata->prev_rdiff , file($file->rel_path)->dir ); # Use ',' construction to make it portable
     $prev_base_dir->mkpath;
 
-	# Maybe the file does not exists if it is new 
-	if (! -f $file_name) { return;}
 
 # Build absolute path of file in repository and move it from current rdiff to previous rdiff
     unless (

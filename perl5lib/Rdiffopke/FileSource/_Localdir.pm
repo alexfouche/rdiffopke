@@ -1,6 +1,6 @@
 ###############################
 #
-# Class:  Rdiffopke::FileSource::_Localdir
+# Class:  Rdiffopke::FileSource::_LocalDir
 #
 ###############################
 
