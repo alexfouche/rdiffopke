@@ -85,17 +85,15 @@ sub prepare {
         Rdiffopke::Metadata->new(
             dbfile     => $self->_get_metadata_dbfile,
             upgrade_to => $self->need_metadata_schema_version,
-                   )
+        )
     );
     $self->_set_userkey(
-        Rdiffopke::UserKey->new(
-            key     => $self->_create_get_userkey,
-                    )
-    ) unless ( $self->no_encryption );
+        Rdiffopke::UserKey->new( key => $self->_create_get_userkey, ) )
+      unless ( $self->no_encryption );
 
     ::verbose_message(
         "Finished preparing repository at '" . $self->url . "'\n" )
-      if ( $Rdiffopke::verbose );
+      if ($Rdiffopke::verbose);
 }
 
 sub _get_metadata_dbfile {
@@ -169,7 +167,7 @@ sub compare_files {
 "Function 'compare_files' needs to be given a FileList instance of the files on the source\n"
         );
     }
-$DB::single=1;
+
 # I suppose if lists are big, it is better to use directly variables instead of accessors
     my $repo_file_list = $self->metadata->get_detailed_file_list;
 
@@ -177,42 +175,62 @@ $DB::single=1;
     my @list_files_to_update_metadata   = ();
     my @list_files_to_discard_from_repo = ();
 
+# A few cases:
+# Item is completely unchanged (mtime, size, type) -> Do nothing (Item will be elevated to new rdiff metadata->elevate_files_to_last_rdiff )
+# Item is in source but not in repo -> Add source item to repo
+# Item is in repo and has disappeared from source -> discard from repo (move to previous rdiff)
+# Item type has changed -> discard from old item from repo and add source item in repo for last rdiff
+# Item is same type, but size and mtime has changed (content modified) -> discard from old item from repo and add source item in repo for last rdiff
+# Item is same type, same content, but other metadata has changed -> discard old metadata from repo and add new metadata for new rdiff
     foreach ( keys %$source_file_list ) {
         if ( $repo_file_list->{$_} ) {
 
-            # It exists in repository, so check if metadata is modified
-            # mode, uid, gid, size, mtime, type,
             if (
-                $source_file_list->{$_}->mtime ne $repo_file_list->{$_}->mtime
-                || $source_file_list->{$_}->size != $repo_file_list->{$_}->size
-                || (
-                    $source_file_list->{$_}->type ne $repo_file_list->{$_}->type
-                    && $source_file_list->{$_}->type ne 'dir' )
+
+# Item type has changed -> discard from old item from repo and add source item in repo for last rdiff
+                $source_file_list->{$_}->type ne $repo_file_list->{$_}->type
+
+# Item is same type, but size and mtime has changed (content modified) -> discard from old item from repo and add source item in repo for last rdiff
+                || ( $source_file_list->{$_}->mtime ne
+                       $repo_file_list->{$_}->mtime
+                    || $source_file_list->{$_}->size !=
+                    $repo_file_list->{$_}->size )
               )
             {
+
                 push( @list_files_to_transfer, $source_file_list->{$_} );
-  				$repo_file_list->{$_}->{processed} = 1;
+                $repo_file_list->{$_}->{processed} = 1;
                 next;
             }
-            push( @list_files_to_update_metadata, $source_file_list->{$_} )
-              if ( $source_file_list->{$_}->mode ne $repo_file_list->{$_}->mode
-                || $source_file_list->{$_}->uid  ne $repo_file_list->{$_}->uid
-                || $source_file_list->{$_}->gid  ne $repo_file_list->{$_}->gid
-                || $source_file_list->{$_}->type ne
-                $repo_file_list->{$_}->type );
+
+# Item is same type, same content, but other metadata has changed -> discard old metadata from repo and add new metadata for new rdiff
+            if (   $source_file_list->{$_}->mode ne $repo_file_list->{$_}->mode
+                || $source_file_list->{$_}->uid ne $repo_file_list->{$_}->uid
+                || $source_file_list->{$_}->gid ne $repo_file_list->{$_}->gid )
+            {
+                push( @list_files_to_update_metadata, $source_file_list->{$_} );
+                $repo_file_list->{$_}->{processed} = 1;
+                next;
+            }
+
+# Item is completely unchanged (mtime, size, type) -> Do nothing (Item will be elevated to new rdiff metadata->elevate_files_to_last_rdiff )
             $repo_file_list->{$_}->{processed} = 1;
         }
         else {
 
-            # Needs transfer
+            # Item is in source but not in repo -> Add source item to repo
             push @list_files_to_transfer, $source_file_list->{$_};
         }
     }
 
-    push( @list_files_to_discard_from_repo, $repo_file_list->{$_} ) foreach (
+# Item is in repo and has disappeared from source -> discard from repo (move to previous rdiff)
+    foreach (
         grep { !$repo_file_list->{$_}->{processed} }
         keys(%$repo_file_list)
-    );
+      )
+    {
+        push( @list_files_to_discard_from_repo, $repo_file_list->{$_} );
+    }
 
     $self->_set_list_files_to_discard_from_repo(
         \@list_files_to_discard_from_repo );
@@ -272,14 +290,17 @@ sub transfer_files {
 # This means a discard of current file in repository to previous rdiff, and add source file to new rdiff
 # $_ is a Rdiffopke::File instance
     foreach ( @{ $self->list_files_to_transfer } ) {
-        $self->metadata->discard_file($_)
+        my $path_id = $self->metadata->discard_file($_)
           ;    # push modified metadata and file content to previous rdiff
-        $self->_discard_file($_); # if ( $_->is_file );    # push repository file to previous rdiff folder
+        $self->_discard_file($_)
+          ; # if ( $_->is_file );    # push repository file to previous rdiff folder
 
 # $localfile is a small array [localpath, 'mtime', 'size'] of the file stored in the repository
         my $localfile = $self->_transfer_file($_)
           if ( $_->is_file )
           ; # Transfer the file from source to repository in new rdiff directory
+
+		push @$localfile, $path_id;
         $self->metadata->add_file( $_, $localfile )
           ; # recreate update metadata and associate reference to file in repository
     }
@@ -301,7 +322,8 @@ sub transfer_files {
     foreach ( @{ $self->list_files_to_discard_from_repo } ) {
         $self->metadata->discard_file($_)
           ;    # push modified metadata to previous rdiff
-        $self->_discard_file($_); # if ( $_->is_file );    # push repository file to previous rdiff folder
+        $self->_discard_file($_)
+          ; # if ( $_->is_file );    # push repository file to previous rdiff folder
     }
     $self->_set_list_files_to_discard_from_repo( [] );    # can't hurt
 
@@ -341,26 +363,24 @@ sub verify {
 
     $self->prepare unless ( defined $self->metadata );
 
-	# Here verify parts generic for all repository implementations
-	
-	# Here verify parts that are only relevant to metadata alone 
-	$self->metadata->verify;
-	
-	# Here verify parts that are relevant to specific implementation of repository
+    # Here verify parts generic for all repository implementations
+
+    # Here verify parts that are only relevant to metadata alone
+    $self->metadata->verify;
+
+  # Here verify parts that are relevant to specific implementation of repository
     $self->_verify;
 
-
-	# TODO
-	# check if there are empty dirs in repo (all data/xx/ dirs)
-	# foreach rdiff
+    # TODO
+    # check if there are empty dirs in repo (all data/xx/ dirs)
+    # foreach rdiff
     #		get detailled list  of files in repo, with size and date
-	#		compare with metadata 
-	#       check if metadata contains files which should be in repo
-	
-	# Metadata 
-	# check if metadata has doublons in localfiles, files or paths table
-	# check integrity of db with rdiff, check if there are orphans
+    #		compare with metadata
+    #       check if metadata contains files which should be in repo
 
+    # Metadata
+    # check if metadata has doublons in localfiles, files or paths table
+    # check integrity of db with rdiff, check if there are orphans
 
 }
 

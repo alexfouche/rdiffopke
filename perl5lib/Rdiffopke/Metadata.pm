@@ -305,9 +305,8 @@ sub _discard_file_metadata {
 	if(!defined $file_id){ return;}
 
     # Update the record to belong to previous revision
-    $self->_dbh->do( "update files set rdiff=" . $self->prev_rdiff    . ", uid='" . $file->uid . "', gid='"  . $file->gid   . "', mode='"  . $file->mode     . "', mtime='" . $file->mtime  . "', type='"   . $file->type  . "', size="    . $file->size . " where file_id=$file_id;"
-	 );
-
+    $self->_dbh->do( "update files set rdiff=" . $self->prev_rdiff    . ", uid='" . $file->uid . "', gid='"  . $file->gid   . "', mode='"  . $file->mode     . "', mtime='" . $file->mtime  . "', type='"   . $file->type  . "', size="    . $file->size . " where file_id=$file_id;" );
+	$self->_dbh->do( "update files set rdiff=" . $self->prev_rdiff ." where file_id=$file_id;" );
     return $path_id;
 }
 
@@ -321,27 +320,26 @@ sub _add_file_metadata {
     my $localfile = shift
       ; # localfile is a small array [localpath, 'mtime', 'size'], needed if we want to insert a file transferred to repository
 
+$DB::single=1;
     unless ( defined $path_id ) {
 
-# First add a path entry in database
+# If the path does not already exists, add a path entry in database
 # If it is not performant, we should put the path directly in the 'files' table.
 # There is no schema constraint to have the path separated in the 'paths' table, just that i though
 # it would take less space in DB if we have a lot of long paths and a lot of file changes between runs of rdiffopke
-        $self->_dbh->do(
-            "insert into paths(path) values('" . $file->rel_path . "');" );
-        $path_id =
-          $self->_dbh->selectrow_array( 'select path_id from paths where path="'
-              . $file->rel_path
-              . '" order by path_id desc limit 1;' );
-        unless ($path_id) {
-            Rdiffopke::Exception::Metadata->throw(
-                error => "Could not add a path_id in metadata\n" );
+ $path_id = $self->_dbh->selectrow_array( 'select max(path_id) from paths where path="'. $file->rel_path  . '" ;' );
+	  unless ($path_id) {
+        $self->_dbh->do( "insert into paths(path) values('" . $file->rel_path . "');" );
+ 			$path_id = $self->_dbh->selectrow_array( 'select max(path_id) from paths where path="'. $file->rel_path  . '" ;' );
+      unless ($path_id) {
+             Rdiffopke::Exception::Metadata->throw(error => "Could not add a path_id in metadata\n" );
+}
         }
     }
 
 	# We are given a 'localfiles' table record structure, let's create it and put the reference in the 'files' record
     my $localfile_id;
-    if ( defined $localfile ) {
+    if ( defined $localfile && $file->is_file ) {
 
         # First add a localfile entry in database
         $self->_dbh->do( 'insert into localfiles(path, mtime, size) values("'
@@ -385,11 +383,12 @@ sub discard_file {
     my $self = shift;
     my $file = shift;    # Should be a Rdiffopke::File
 
+	my $path_id;
     eval {
         $self->_dbh->begin_work;
 
         # Discard the file metadata to previous revision
-        $self->_discard_file_metadata($file);
+        $path_id= $self->_discard_file_metadata($file);
 
         # There is nothing to do for the file content (localfiles table)
     }
@@ -400,6 +399,8 @@ sub discard_file {
               . $self->_dbh->errstr );
     };
     $self->_dbh->commit;
+
+	return $path_id;
 }
 
 # push modified metadata to previous rdiff and replace with a new one
@@ -430,16 +431,18 @@ sub add_file {
     my $self = shift;
     my $file = shift;    # Should be a Rdiffopke::File
     my $localfile =
-      shift;    # localfile is a small array [localpath, 'mtime', 'size']
+      shift;    # localfile is a small array [localpath, 'mtime', 'size', optional path_id]
 
     eval {
         $self->_dbh->begin_work;
 
         # Discard the file metadata to previous rdiff
-        my $path_id = $self->_discard_file_metadata($file);
+		# Commented because it is already done in the caller Repository->transfer_files()
+        # my $path_id = $self->_discard_file_metadata($file);
 
         # add a new the file metadata to current rdiff
-        $self->_add_file_metadata( $file, $path_id, $localfile );
+        # $self->_add_file_metadata( $file, $path_id, $localfile );
+        $self->_add_file_metadata( $file, $localfile->[3], $localfile );
     }
     ;if($@) {
         $self->_dbh->rollback;

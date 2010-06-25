@@ -212,12 +212,6 @@ ok(-f file($repodir->dirname,'data', '5', 'file2')->stringify, 'file2 for rdiff 
 is($path, 'file2', 'file2 is in repo rdiff 5');
 is($type, 'file', 'file2 is type file');
 
-
-diag("Temp source directory: ".$sourcedir->dirname);
-diag("Temp repo directory: ".$repodir->dirname);
-
-$DB::single=1;
-
 $file1_h=create_file($sourcedir->dirname, 'file1', 'something');
 
 $rdiffopke->compare_files;
@@ -244,7 +238,7 @@ ok(-f file($repodir->dirname,'data', '6', 'file1')->stringify, 'file1 for rdiff 
 is($path, 'file1', 'file1 is in repo rdiff 6');
 is($type, 'file', 'file1 is type file');
 
-ok(-d dir($repodir->dirname,'data', '6')->stringify, 'dir for rdiff 5 exists');
+ok(-d dir($repodir->dirname,'data', '6')->stringify, 'dir for rdiff 6 exists');
 ok(-f file($repodir->dirname,'data', '6', 'file2')->stringify, 'file2 for rdiff 6 exists');
 ($path, $type) =$metadata_dbh->selectrow_array("select paths.path, files.type  from files, paths, localfiles where rdiff=6 and  paths.path='file2' and files.path_id=paths.path_id and localfiles.localfile_id=files.localfile_id;");
 is($path, 'file2', 'file2 is in repo rdiff 6');
@@ -253,6 +247,60 @@ is($type, 'file', 'file2 is type file');
 ok(!-e file($repodir->dirname,'data', '5', 'file2')->stringify, 'file2 for rdiff 5 does not exists');
 ($path) =$metadata_dbh->selectrow_array("select paths.path  from files, paths, localfiles where rdiff=5 and  paths.path='file2' and files.path_id=paths.path_id and localfiles.localfile_id=files.localfile_id;");
 is($path, undef, 'file1 is not in rdiff 5');
+
+unlink file($sourcedir->dirname, 'file1')->stringify;
+mkdir file($sourcedir->dirname, 'file1')->stringify;
+
+diag("Temp source directory: sdir=".$sourcedir->dirname);
+diag("Temp repo directory: rdir=".$repodir->dirname);
+
+$DB::single=1;
+
+$rdiffopke->compare_files;
+$rdiffopke->transfer_files;
+
+
+
+ok(!-e dir($repodir->dirname,'data', '4')->stringify, 'dir for rdiff 4 does not exists');
+ok(-d dir($repodir->dirname,'data', '3')->stringify, 'dir for rdiff 3 exists');
+ok(-f file($repodir->dirname,'data', '3', 'file1')->stringify, 'file1 for rdiff 3 exists');
+($path, $type) =$metadata_dbh->selectrow_array("select paths.path, files.type  from files, paths, localfiles where rdiff=3 and  paths.path='file1' and files.path_id=paths.path_id and localfiles.localfile_id=files.localfile_id;");
+is($path, 'file1', 'file1 is in repo rdiff 3');
+is($type, 'file', 'file1 is type file');
+($path) =$metadata_dbh->selectrow_array("select paths.path  from files, paths, localfiles where rdiff=4 and  paths.path='file1' and files.path_id=paths.path_id and localfiles.localfile_id=files.localfile_id;");
+is($path, undef, 'file1 is not in rdiff 4');
+
+ok(-d dir($repodir->dirname,'data', '5')->stringify, 'dir for rdiff 5 exists');
+ok(-f file($repodir->dirname,'data', '5', 'file1')->stringify, 'file1 for rdiff 5 exists');
+($path, $type) =$metadata_dbh->selectrow_array("select paths.path, files.type  from files, paths, localfiles where rdiff=5 and  paths.path='file1' and files.path_id=paths.path_id and localfiles.localfile_id=files.localfile_id;");
+is($path, 'file1', 'file1 is in repo rdiff 5');
+is($type, 'file', 'file1 is type file');
+
+ok(-d dir($repodir->dirname,'data', '6')->stringify, 'dir for rdiff 6 exists');
+ok(-f file($repodir->dirname,'data', '6', 'file1')->stringify, 'file1 for rdiff 6 exists');
+($path, $type) =$metadata_dbh->selectrow_array("select paths.path, files.type  from files, paths, localfiles where rdiff=6 and  paths.path='file1' and files.path_id=paths.path_id and localfiles.localfile_id=files.localfile_id;");
+is($path, 'file1', 'file1 is in repo rdiff 6');
+is($type, 'file', 'file1 is type file');
+
+ok(-d dir($repodir->dirname,'data', '7')->stringify, 'dir for rdiff 7 exists');
+ok(-f file($repodir->dirname,'data', '7', 'file2')->stringify, 'file2 for rdiff 7 exists');
+($path, $type) =$metadata_dbh->selectrow_array("select paths.path, files.type  from files, paths, localfiles where rdiff=7 and  paths.path='file2' and files.path_id=paths.path_id and localfiles.localfile_id=files.localfile_id;");
+is($path, 'file2', 'file2 is in repo rdiff 7');
+is($type, 'file', 'file2 is type file');
+
+ok(!-e file($repodir->dirname,'data', '6', 'file2')->stringify, 'file2 for rdiff 6 does not exists');
+($path) =$metadata_dbh->selectrow_array("select paths.path  from files, paths, localfiles where rdiff=6 and  paths.path='file2' and files.path_id=paths.path_id and localfiles.localfile_id=files.localfile_id;");
+is($path, undef, 'file1 is not in rdiff 6');
+
+ok(!-f file($repodir->dirname,'data', '7', 'file1')->stringify, 'file1 (file) for rdiff 7 does not exists');
+($path) =$metadata_dbh->selectrow_array("select paths.path  from files, paths where rdiff=7 and  paths.path='file1' and files.path_id=paths.path_id and files.type='file';");
+is($path, undef, 'file1 (file) is not in rdiff 7');
+($path) =$metadata_dbh->selectrow_array("select paths.path  from files, paths where rdiff=7 and  paths.path='file1' and files.path_id=paths.path_id and files.type='dir';");
+is($path, 'file1', 'file1 (dir) is in repo rdiff 7');
+
+
+
+
 
 
 done_testing;

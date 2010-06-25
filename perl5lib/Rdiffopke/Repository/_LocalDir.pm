@@ -158,7 +158,7 @@ override '_discard_file' => sub {
     my $file_name = file( $self->url ,'data',$self->metadata->rdiff , $file->rel_path ); # Use ',' construction to make it portable
 
 	# Maybe the file does not exists if it is new 
-	if (! -f $file_name) { return;}
+	if (! -e $file_name) { return;}
 
     # First we recreate the original arborescence in the previous rdiff dir
 	my $base_dir = $file_name->dir;
@@ -168,7 +168,7 @@ override '_discard_file' => sub {
 
 # Build absolute path of file in repository and move it from current rdiff to previous rdiff
     unless (
-        move(  file("$base_dir", $file_name->basename),   file("$prev_base_dir", $file_name->basename)  )
+        move(  file("$base_dir", $file_name->basename)->stringify,   file("$prev_base_dir", $file_name->basename)->stringify  )
       )
     {
         Rdiffopke::Exception::Repository->throw(
