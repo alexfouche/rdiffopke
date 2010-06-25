@@ -176,7 +176,7 @@ sub _upgrade_schema {
             'create table rdiffs (rdiff integer primary key not null, date_begin datetime not null, date_end datetime not null, message text);',
             'create table options (name text primary key not null, value text);',
             'create table files (file_id integer primary key autoincrement not null, rdiff integer not null, path_id integer not null, localfile_id integer,
-	retrieval_date datetime not null, uid text, gid text, mode text, mtime datetime not null, type text not null, size integer not null );',
+	retrieval_date datetime not null, uid text, gid text, mode text, mtime datetime not null, type text not null, size integer not null, target text );',
             'create table paths (path_id integer primary key autoincrement not null, path text not null);',
             'create table localfiles (localfile_id integer primary key autoincrement not null, path text not null, mtime datetime not null, size integer not null, key_id integer);',
             'create table keys ( key_id integer primary key autoincrement not null, key blob not null);',
@@ -235,10 +235,10 @@ sub get_detailed_file_list {
     eval {
         # All the files (has a join on table 'localfiles')
         $sql_rows_files = $self->_dbh->selectall_arrayref(
-            "select file_id, paths.path, localfiles.path, uid, gid, mode, files.mtime, files.size, type from files, paths, localfiles where rdiff=$rdiff and files.path_id=paths.path_id and files.localfile_id=localfiles.localfile_id and files.type = 'file' ;"
+            "select file_id, paths.path, localfiles.path, uid, gid, mode, files.mtime, files.size, type, target from files, paths, localfiles where rdiff=$rdiff and files.path_id=paths.path_id and files.localfile_id=localfiles.localfile_id and files.type = 'file' ;"
         );
         $sql_rows_others = $self->_dbh->selectall_arrayref(
-            "select file_id, paths.path, null, uid, gid, mode, files.mtime, files.size, type from files, paths 
+            "select file_id, paths.path, null, uid, gid, mode, files.mtime, files.size, type, target from files, paths 
 where rdiff=$rdiff and files.path_id=paths.path_id and files.type != 'file' ;"
         );
     };
@@ -261,6 +261,7 @@ where rdiff=$rdiff and files.path_id=paths.path_id and files.type != 'file' ;"
                 mtime    => $_->[6],
                 size     => $_->[7],
                 type     => $_->[8],
+                target   => $_->[9],
             )
         );
     }
@@ -296,7 +297,6 @@ sub _discard_file {
     if ( !defined $file_id ) { return; }
 
     # Update the record to belong to previous revision
-    # $self->_dbh->do( "update files set rdiff=" . $self->prev_rdiff    . ", uid='" . $file->uid . "', gid='"  . $file->gid   . "', mode='"  . $file->mode     . "', mtime='" . $file->mtime  . "', type='"   . $file->type  . "', size="    . $file->size . " where file_id=$file_id;" );
     $self->_dbh->do( "update files set rdiff=" . $self->prev_rdiff . " where file_id=$file_id;" );
     return $path_id;
 }
@@ -354,9 +354,14 @@ sub _add_file {
         $localfile_id_string2 = "$localfile_id , ";
     }
 
+    my ( $target_string1, $target_string2 ) = ( '', '' );
+    if ( defined( $file->target ) && $file->target ne '' ) {
+        $target_string1 = "target,";
+        $target_string2 = "'" . $file->target . "' , ";
+    }
 
     $self->_dbh->do(
-        "insert into files(rdiff, path_id, $localfile_id_string1 uid, gid, mode, mtime, type, size, retrieval_date) values("
+        "insert into files(rdiff, path_id, $localfile_id_string1 uid, gid, mode, mtime, type, size, $target_string1  retrieval_date) values("
             . $self->rdiff . ","
             . $path_id
             . ", $localfile_id_string2 " . "'"
@@ -365,8 +370,9 @@ sub _add_file {
             . $file->mode . "','"
             . $file->mtime . "','"
             . $file->type . "',"
-            . $file->size
-            . ",'');" );
+            . $file->size . ","
+            . "$target_string2"
+            . "'');" );
 }
 
 # push modified metadata and file content (localfiles table record) to previous rdiff

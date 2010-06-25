@@ -8,6 +8,7 @@ package Rdiffopke::File::_LocalFile;
 
 use Moose;
 use FileHandle;
+use Path::Class;
 #use IO::Handle '_IOFBF';
 
 extends 'Rdiffopke::File';
@@ -26,6 +27,20 @@ sub BUILD {
         }
 
     SWITCH: {
+            -l $self->path && do {
+                $self->_set_type('slink');
+                my $target = readlink( $self->path );
+ 
+                unless ( defined $target ) {
+                    Rdiffopke::Exception::File->throw(
+                              error => "Could not extract the target from symlink "
+                            . $self->path
+                            . "\n" );
+                }
+                $self->target($target);
+
+                last SWITCH;
+            };
             -f $self->path && do {
                 $self->_set_type('file');
                 $self->_create_handle( FileHandle->new );
@@ -37,10 +52,6 @@ sub BUILD {
             };
             -d $self->path && do {
                 $self->_set_type('dir');
-                last SWITCH;
-            };
-            -l $self->path && do {
-                $self->_set_type('slink');
                 last SWITCH;
             };
 

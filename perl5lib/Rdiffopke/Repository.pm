@@ -181,7 +181,6 @@ sub compare_files {
         if ( $repo_file_list->{$_} ) {
 
             if (
-
                 # Item type has changed -> discard from old item from repo and add source item in repo for last rdiff
                 $source_file_list->{$_}->type ne $repo_file_list->{$_}->type
 

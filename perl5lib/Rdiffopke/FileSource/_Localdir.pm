@@ -39,28 +39,34 @@ override 'get_detailed_file_list' => sub {
     find(
         {
             wanted => sub {
-                my $stat     = stat($_);
+                my $stat     = lstat($_);
                 my $rel_path = file($File::Find::name)->relative($dir);
                 # my $rel_path = $File::Find::name;
                 # $rel_path =~ s/^$root_path\/// ;   # Not portable
 
-                $file_list->add(
-                    $rel_path,
-                    Rdiffopke::File::_LocalFile->new(
-                        rel_path => $rel_path->stringify,
-                        path     => $File::Find::name,
-                        mode     => $stat->mode,
-                        uid      => $stat->uid,
-                        gid      => $stat->gid,
-                        size     => $stat->size,
-
-                        # mtime => scalar( gmtime( $stat->mtime ) ),
-                        mtime => $stat->mtime,
-                    )
+                my $finded_file = Rdiffopke::File::_LocalFile->new(
+                    rel_path => $rel_path->stringify,
+                    path     => $File::Find::name,
+                    mode     => $stat->mode,
+                    uid      => $stat->uid,
+                    gid      => $stat->gid,
+                    size     => $stat->size,
+                    # mtime => scalar( gmtime( $stat->mtime ) ),
+                    mtime => $stat->mtime,
                 );
+
+                # Sanitize symlink if needed
+                if ( defined( $finded_file->target ) ) {
+                    my $tmpfile = file( $finded_file->target )->cleanup;
+                    $tmpfile = file( $dir, $tmpfile ) if ( $tmpfile->is_relative );
+                    $finded_file->target( $tmpfile->relative($dir)->stringify )
+                        if ( $dir->subsumes($tmpfile) );
+                }
+
+                $file_list->add( $rel_path, $finded_file );
             },
             no_chdir => 1,
-            follow   => 0
+            follow   => 0,
         },
         $dir->stringify,
     );

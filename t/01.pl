@@ -282,10 +282,6 @@ is($path, undef, 'file1 is not in rdiff 5');
 unlink file($sourcedir->dirname, 'file1')->stringify;
 mkdir file($sourcedir->dirname, 'file1')->stringify;
 
-diag("Temp source directory: sdir=".$sourcedir->dirname);
-diag("Temp repo directory: rdir=".$repodir->dirname);
-$DB::single=1;
-
 # Source
 #	file1 <- is a directory
 #	file2 (blabla)
@@ -333,6 +329,65 @@ ok(!-f file($repodir->dirname,'data', '7', 'file1')->stringify, 'file1 (file) fo
 is($path, undef, 'file1 (file) is not in rdiff 7');
 ($path) =$metadata_dbh->selectrow_array("select paths.path  from files, paths where rdiff=7 and  paths.path='file1' and files.path_id=paths.path_id and files.type='dir';");
 is($path, 'file1', 'file1 (dir) is in repo rdiff 7');
+
+
+diag("Temp source directory: sdir=".$sourcedir->dirname);
+diag("Temp repo directory: rdir=".$repodir->dirname);
+$DB::single=1;
+
+my $can_symlink = (eval { symlink("", ""); }, $@ eq "");
+if ( $can_symlink){
+	symlink( '/bin/ls', file($sourcedir->dirname, 'link1')->stringify );
+	symlink( file($sourcedir->dirname, 'file2')->stringify, file($sourcedir->dirname, 'link2')->stringify );
+	symlink( 'file2', file($sourcedir->dirname, 'link3')->stringify );
+	symlink( file($sourcedir->dirname, 'file1','..', 'file2')->stringify, file($sourcedir->dirname, 'link4')->stringify );
+}
+
+# Source
+#   file1 <- is a directory
+#   file2 (blabla)
+#   link1 (/bin/ls)
+#   link2 ($sourcedir->dirname / file2)
+#   link3 (file2)
+#   link4 ($sourcedir->dirname /file1/../ file2)
+# Repository
+#   3 file1 (abc)
+#   6 file1 (abc)
+#	7 file1 <- is a directory
+#   7 file2 (blabla)
+$rdiffopke->compare_files;
+$rdiffopke->transfer_files;
+# Created rdiff is 8
+
+SKIP: {
+    skip 'Platform does not support symlinks', 9 unless $can_symlink;
+
+	my ($path, $target, $type) = $metadata_dbh->selectrow_array("select path, target, type from files, paths where rdiff=8 and  paths.path='link1' and files.path_id=paths.path_id ;");
+	is($path, 'link1', 'link1 is in rdiff 8');
+	is($type, 'slink', 'link1 is type slink');
+	is($target, '/bin/ls', 'link1 targets /bin/ls');
+
+	($path, $target, $type) = $metadata_dbh->selectrow_array("select path, target, type from files, paths where rdiff=8 and  paths.path='link2' and files.path_id=paths.path_id ;");
+	is($path, 'link2', 'link2 is in rdiff 8');
+	is($type, 'slink', 'link2 is type slink');
+	is($target, 'file2', 'link2 targets file2');
+
+	($path, $target, $type) = $metadata_dbh->selectrow_array("select path, target, type from files, paths where rdiff=8 and  paths.path='link3' and files.path_id=paths.path_id ;");
+	is($path, 'link3', 'link3 is in rdiff 8');
+	is($type, 'slink', 'link3 is type slink');
+	is($target, 'file2', 'link3 targets file2');
+
+	SKIP:{
+	  	skip 'The Path::Class->cleanup does not clean ".."', 3 if 1;
+		($path, $target, $type) = $metadata_dbh->selectrow_array("select path, target, type from files, paths where rdiff=8 and  paths.path='link4' and files.path_id=paths.path_id ;");
+		is($path, 'link4', 'link4 is in rdiff 8');
+		is($type, 'slink', 'link4 is type slink');
+		is($target, 'file2', 'link4 targets file2');
+	}
+}
+
+
+
 
 
 
