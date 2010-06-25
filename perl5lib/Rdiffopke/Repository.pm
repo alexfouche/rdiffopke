@@ -12,16 +12,13 @@ use Rdiffopke::UserKey;
 use Rdiffopke::Exception;
 use Rdiffopke::SubTypes;
 
-has 'no_encryption' => ( is => 'ro', isa => 'Bool', default  => 0 );
-has 'url'           => ( is => 'ro', isa => 'Str',  required => 1 );
-has 'need_metadata_schema_version' =>
-  ( is => 'ro', isa => 'Int', required => 1 );
+has 'no_encryption'                => ( is => 'ro', isa => 'Bool', default  => 0 );
+has 'url'                          => ( is => 'ro', isa => 'Str',  required => 1 );
+has 'need_metadata_schema_version' => ( is => 'ro', isa => 'Int',  required => 1 );
 
 #has 'need_metadata_schema_version' =>( is => 'ro', isa => 'PositiveInt', required => 1 ); # TOFIX why is TypeConstraint not working ?
-has 'metadata' =>
-  ( is => 'ro', isa => 'Rdiffopke::Metadata', writer => '_set_metadata' );
-has 'userkey' =>
-  ( is => 'ro', isa => 'Rdiffopke::UserKey', writer => '_set_userkey' );
+has 'metadata' => ( is => 'ro', isa => 'Rdiffopke::Metadata', writer => '_set_metadata' );
+has 'userkey'  => ( is => 'ro', isa => 'Rdiffopke::UserKey',  writer => '_set_userkey' );
 has 'list_files_to_discard_from_repo' => (
     is      => 'rw',
     isa     => 'ArrayRef',
@@ -40,15 +37,16 @@ has 'list_files_to_update_metadata' => (
     default => sub { [] },
     writer  => '_set_list_files_to_update_metadata'
 );
-has 'source_url' => ( is => 'ro', isa => 'Str', required => 1 )
-  ;    # For informational purposes only
+has 'source_url' => ( is => 'ro', isa => 'Str', required => 1 );   # For informational purposes only
+
+has 'want_rdiffbackup' => ( is => 'ro', isa => 'Bool', default => 0 );
 
 sub BUILD {
     my $self = shift;
 
     if ( ref($self) eq 'Rdiffopke::Repository' ) {
         Rdiffopke::Exception::Repository->throw( error =>
-"The Rdiffopke::Repository class is a base virtual class and can not be instanciated\n"
+                "The Rdiffopke::Repository class is a base virtual class and can not be instanciated\n"
         );
     }
 }
@@ -62,14 +60,13 @@ sub prepare {
 
     if ( !$self->userkey_exists && !$self->no_encryption && $self->has_data ) {
         Rdiffopke::Exception::Repository->throw( error =>
-"Repository has data inside but is missing the public key file and you requested encryption\n"
+                "Repository has data inside but is missing the public key file and you requested encryption\n"
         );
     }
 
     if ( $self->no_encryption && $self->userkey_exists ) {
-        Rdiffopke::Exception::Repository->throw( error =>
-"You have requested no encryption but there is a public key file\n"
-        );
+        Rdiffopke::Exception::Repository->throw(
+            error => "You have requested no encryption but there is a public key file\n" );
     }
 
     if (   !$self->no_encryption
@@ -77,7 +74,7 @@ sub prepare {
         && $self->metadata->exists )
     {
         Rdiffopke::Exception::Repository->throw( error =>
-"There is a metadata file  but the public key file is missing ! Set to 'no encryption' if you never used it there\n"
+                "There is a metadata file  but the public key file is missing ! Set to 'no encryption' if you never used it there\n"
         );
     }
 
@@ -87,21 +84,19 @@ sub prepare {
             upgrade_to => $self->need_metadata_schema_version,
         )
     );
-    $self->_set_userkey(
-        Rdiffopke::UserKey->new( key => $self->_create_get_userkey, ) )
-      unless ( $self->no_encryption );
+    $self->_set_userkey( Rdiffopke::UserKey->new( key => $self->_create_get_userkey, ) )
+        unless ( $self->no_encryption );
 
-    ::verbose_message(
-        "Finished preparing repository at '" . $self->url . "'\n" )
-      if ($Rdiffopke::verbose);
+    ::verbose_message( "Finished preparing repository at '" . $self->url . "'\n" )
+        if ($Rdiffopke::verbose);
 }
 
 sub _get_metadata_dbfile {
     my $self = shift;
 
     if ( ref($self) eq 'Rdiffopke::Repository' ) {
-        Rdiffopke::Exception::Repository->throw( error =>
-              "The _get_metadata_dbfile function needs to be overriden\n" );
+        Rdiffopke::Exception::Repository->throw(
+            error => "The _get_metadata_dbfile function needs to be overriden\n" );
     }
 }
 
@@ -109,8 +104,8 @@ sub _create_get_userkey {
     my $self = shift;
 
     if ( ref($self) eq 'Rdiffopke::Repository' ) {
-        Rdiffopke::Exception::Repository->throw( error =>
-              "The '_create_get_userkey' function needs to be overriden\n" );
+        Rdiffopke::Exception::Repository->throw(
+            error => "The '_create_get_userkey' function needs to be overriden\n" );
     }
 }
 
@@ -164,46 +159,43 @@ sub compare_files {
         && $source_file_list->isa('Rdiffopke::FileList') )
     {
         Rdiffopke::Exception::Repository->throw( error =>
-"Function 'compare_files' needs to be given a FileList instance of the files on the source\n"
+                "Function 'compare_files' needs to be given a FileList instance of the files on the source\n"
         );
     }
 
-# I suppose if lists are big, it is better to use directly variables instead of accessors
+    # I suppose if lists are big, it is better to use directly variables instead of accessors
     my $repo_file_list = $self->metadata->get_detailed_file_list;
 
     my @list_files_to_transfer          = ();
     my @list_files_to_update_metadata   = ();
     my @list_files_to_discard_from_repo = ();
 
-# A few cases:
-# Item is completely unchanged (mtime, size, type) -> Do nothing (Item will be elevated to new rdiff metadata->elevate_files_to_last_rdiff )
-# Item is in source but not in repo -> Add source item to repo
-# Item is in repo and has disappeared from source -> discard from repo (move to previous rdiff)
-# Item type has changed -> discard from old item from repo and add source item in repo for last rdiff
-# Item is same type, but size and mtime has changed (content modified) -> discard from old item from repo and add source item in repo for last rdiff
-# Item is same type, same content, but other metadata has changed -> discard old metadata from repo and add new metadata for new rdiff
+    # A few cases:
+    # Item is completely unchanged (mtime, size, type) -> Do nothing (Item will be elevated to new rdiff metadata->elevate_files_to_last_rdiff )
+    # Item is in source but not in repo -> Add source item to repo
+    # Item is in repo and has disappeared from source -> discard from repo (move to previous rdiff)
+    # Item type has changed -> discard from old item from repo and add source item in repo for last rdiff
+    # Item is same type, but size and mtime has changed (content modified) -> discard from old item from repo and add source item in repo for last rdiff
+    # Item is same type, same content, but other metadata has changed -> discard old metadata from repo and add new metadata for new rdiff
     foreach ( keys %$source_file_list ) {
         if ( $repo_file_list->{$_} ) {
 
             if (
 
-# Item type has changed -> discard from old item from repo and add source item in repo for last rdiff
+                # Item type has changed -> discard from old item from repo and add source item in repo for last rdiff
                 $source_file_list->{$_}->type ne $repo_file_list->{$_}->type
 
-# Item is same type, but size and mtime has changed (content modified) -> discard from old item from repo and add source item in repo for last rdiff
-                || ( $source_file_list->{$_}->mtime ne
-                       $repo_file_list->{$_}->mtime
-                    || $source_file_list->{$_}->size !=
-                    $repo_file_list->{$_}->size )
-              )
+                # Item is same type, but size and mtime has changed (content modified) -> discard from old item from repo and add source item in repo for last rdiff
+                || (   $source_file_list->{$_}->mtime ne $repo_file_list->{$_}->mtime
+                    || $source_file_list->{$_}->size != $repo_file_list->{$_}->size )
+                )
             {
-
                 push( @list_files_to_transfer, $source_file_list->{$_} );
                 $repo_file_list->{$_}->{processed} = 1;
                 next;
             }
 
-# Item is same type, same content, but other metadata has changed -> discard old metadata from repo and add new metadata for new rdiff
+            # Item is same type, same content, but other metadata has changed -> discard old metadata from repo and add new metadata for new rdiff
             if (   $source_file_list->{$_}->mode ne $repo_file_list->{$_}->mode
                 || $source_file_list->{$_}->uid ne $repo_file_list->{$_}->uid
                 || $source_file_list->{$_}->gid ne $repo_file_list->{$_}->gid )
@@ -213,29 +205,26 @@ sub compare_files {
                 next;
             }
 
-# Item is completely unchanged (mtime, size, type) -> Do nothing (Item will be elevated to new rdiff metadata->elevate_files_to_last_rdiff )
+            # Item is completely unchanged (mtime, size, type) -> Do nothing (Item will be elevated to new rdiff metadata->elevate_files_to_last_rdiff )
             $repo_file_list->{$_}->{processed} = 1;
-        }
-        else {
+        } else {
 
             # Item is in source but not in repo -> Add source item to repo
             push @list_files_to_transfer, $source_file_list->{$_};
         }
     }
 
-# Item is in repo and has disappeared from source -> discard from repo (move to previous rdiff)
+    # Item is in repo and has disappeared from source -> discard from repo (move to previous rdiff)
     foreach (
         grep { !$repo_file_list->{$_}->{processed} }
         keys(%$repo_file_list)
-      )
+        )
     {
         push( @list_files_to_discard_from_repo, $repo_file_list->{$_} );
     }
 
-    $self->_set_list_files_to_discard_from_repo(
-        \@list_files_to_discard_from_repo );
-    $self->_set_list_files_to_update_metadata(
-        \@list_files_to_update_metadata );
+    $self->_set_list_files_to_discard_from_repo( \@list_files_to_discard_from_repo );
+    $self->_set_list_files_to_update_metadata( \@list_files_to_update_metadata );
     $self->_set_list_files_to_transfer( \@list_files_to_transfer );
 }
 
@@ -248,9 +237,8 @@ sub _move_files_to_last_rdiff {
     my $self = shift;
 
     if ( ref($self) eq 'Rdiffopke::Repository' ) {
-        Rdiffopke::Exception::Repository->throw( error =>
-              "The 'move_files_to_last_rdiff' function needs to be overriden\n"
-        );
+        Rdiffopke::Exception::Repository->throw(
+            error => "The 'move_files_to_last_rdiff' function needs to be overriden\n" );
     }
 }
 
@@ -263,55 +251,53 @@ sub transfer_files {
         && defined( $self->list_files_to_update_metadata ) )
     {
         Rdiffopke::Exception::Repository->throw( error =>
-"Some of the transfer plans are not defined. Was a 'compare_files()' run ?\n"
-        );
+                "Some of the transfer plans are not defined. Was a 'compare_files()' run ?\n" );
     }
 
-# We add the new rdiff, and move all the files from the previous rdiff to the new rdiff (since they are by default considered not to have been modified)
+    # We add the new rdiff, and move all the files from the previous rdiff to the new rdiff (since they are by default considered not to have been modified)
     $self->metadata->add_rdiff;
     $self->metadata->elevate_files_to_last_rdiff
-      ;    # Will put all files that are rdiff-1 to rdiff in metadata only
-    $self->_move_files_to_last_rdiff
-      ;    # Will move all files from directory rdiff-1 to rdiff
+        ;    # Will put all files that are rdiff-1 to rdiff in metadata only
+    $self->_move_files_to_last_rdiff;    # Will move all files from directory rdiff-1 to rdiff
 
-    $self->metadata->set_message(
-        'Moved all files from previous rdiff to new rdiff');
+    $self->metadata->set_message('Moved all files from previous rdiff to new rdiff');
 
-# Below, i manage both the repository part and the metadata part, instead of letting the relevant repository function
-# update itself the relevant metadata.
-# This is because the metadata functions methods (eg metadata->discard_file) are generic, while the repository methods ($self->_discard_file)
-# are methods of a child repository class that need to be overwritten to bespecific to the repository actual storage.
-# So you do not have to manage the metadata method calls in your child repository class.
+    # Below, i manage both the repository part and the metadata part, instead of letting the relevant repository function
+    # update itself the relevant metadata.
+    # This is because the metadata functions methods (eg metadata->discard_file) are generic, while the repository methods ($self->_discard_file)
+    # are methods of a child repository class that need to be overwritten to bespecific to the repository actual storage.
+    # So you do not have to manage the metadata method calls in your child repository class.
 
-# TOFIX: I think there might be a bug if a file type changes on the source (eg from file to slink or dir), then it will not be discarded in repository. Also, if a file was a dir or slink and changes to file ?
+    # TOFIX: I think there might be a bug if a file type changes on the source (eg from file to slink or dir), then it will not be discarded in repository. Also, if a file was a dir or slink and changes to file ?
 
-# Transfer all new or modified files from source.
-# This will push current file and metadata to previous rdiff, and transfer source file and metadata to new rdiff
-# This means a discard of current file in repository to previous rdiff, and add source file to new rdiff
-# $_ is a Rdiffopke::File instance
+    # Transfer all new or modified files from source.
+    # This will push current file and metadata to previous rdiff, and transfer source file and metadata to new rdiff
+    # This means a discard of current file in repository to previous rdiff, and add source file to new rdiff
+    # $_ is a Rdiffopke::File instance
     foreach ( @{ $self->list_files_to_transfer } ) {
         # push repository file to previous rdiff folder
-		# "if ( $_->is_file );" commented because :
-		# There is a case when a file on the source has been replaced by something which is not a "file" (eg a folder), and has same path+name
-		# Nevertheless, the current function is given the source file in $_, which in this specific case is not of type 'file'
-		# So having the check below would prevent the file in repository from the previous rdiffopke run to be moved to previous rdiff
-		$self->_discard_file($_); # if ( $_->is_file );    
+        # "if ( $_->is_file );" commented because :
+        # There is a case when a file on the source has been replaced by something which is not a "file" (eg a folder), and has same path+name
+        # Nevertheless, the current function is given the source file in $_, which in this specific case is not of type 'file'
+        # So having the check below would prevent the file in repository from the previous rdiffopke run to be moved to previous rdiff
+        $self->_discard_file($_);    # if ( $_->is_file );
 
-		# Transfer the file from source to repository in new rdiff directory
-		# $localfile is a small array [localpath, 'mtime', 'size'] of the file stored in the repository
-        my $localfile = $self->_transfer_file($_) if ( $_->is_file );
+        # Transfer the file from source to repository in new rdiff directory
+        # $localfile is a small array [localpath, 'mtime', 'size'] of the file stored in the repository
+        my $localfile = $self->_transfer_file($_) if ( $_->is_file || $self->want_rdiffbackup );
 
-        $self->metadata->discard_add_file( $_, $localfile )          ; # recreate update metadata and associate reference to file in repository
+        $self->metadata->discard_add_file( $_, $localfile )
+            ;    # recreate update metadata and associate reference to file in repository
     }
     $self->_set_list_files_to_transfer( [] );    # can't hurt
 
-# Update metadata of files that changed, but whose content (based on size and mtime) was not modified
-# This will push current file metadata to to previous rdiff, and add new metadata to new rdiff.
-# This will not transfer file content from source to repository. Content is believed to be the same as the one already stored in repo
-# $_ is a Rdiffopke::File instance
+	# Update metadata of files that changed, but whose content (based on size and mtime) was not modified
+	# This will push current file metadata to to previous rdiff, and add new metadata to new rdiff.
+	# This will not transfer file content from source to repository. Content is believed to be the same as the one already stored in repo
+	# $_ is a Rdiffopke::File instance
     foreach ( @{ $self->list_files_to_update_metadata } ) {
         $self->metadata->discard_add_file($_)
-          ; # push modified metadata to previous rdiff and replace with a new one
+            ;    # push modified metadata to previous rdiff and replace with a new one
     }
     $self->_set_list_files_to_update_metadata( [] );    # can't hurt
 
@@ -319,16 +305,14 @@ sub transfer_files {
     # This means pushing both metadata and real file to previous rdiff
     # $_ is a Rdiffopke::File instance
     foreach ( @{ $self->list_files_to_discard_from_repo } ) {
-        $self->metadata->discard_file($_)
-          ;    # push modified metadata to previous rdiff
+        $self->metadata->discard_file($_);              # push modified metadata to previous rdiff
         $self->_discard_file($_)
-          ; # if ( $_->is_file );    # push repository file to previous rdiff folder
+            ;    # if ( $_->is_file );    # push repository file to previous rdiff folder
     }
     $self->_set_list_files_to_discard_from_repo( [] );    # can't hurt
 
-    $self->metadata->set_message( 'Repository synced with source '
-          . $self->source_url
-          . ' successfully' );
+    $self->metadata->set_message(
+        'Repository synced with source ' . $self->source_url . ' successfully' );
 }
 
 # push repository file to previous rdiff folder
@@ -367,8 +351,8 @@ sub verify {
     # Here verify parts that are only relevant to metadata alone
     my $somedata = $self->metadata->verify;
 
-  # Here verify parts that are relevant to specific implementation of repository, against data from metadata
-    $self->_verify;
+    # Here verify parts that are relevant to specific implementation of repository, against data from metadata
+    $self->_verify($somedata);
 
     # TODO
     # check if there are empty dirs in repo (all data/xx/ dirs)

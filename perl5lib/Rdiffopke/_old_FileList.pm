@@ -16,8 +16,8 @@ has 'list' => (
     is      => 'ro',
     isa     => 'ArrayRef[Rdiffopke::File]',
     default => sub { [] }
-  );
-has '_iterator' => (is=>'rw', isa=>'Int', default=>0 );
+);
+has '_iterator' => ( is => 'rw', isa => 'Int', default => 0 );
 
 sub add {
     my ( $self, $item ) = @_;
@@ -25,7 +25,7 @@ sub add {
 #    if ( defined($item) && $item->isa('Rdiffopke::File') ) {
 #        $self->list->{ $item->path } = $item;
 #    }
-push @{$self->{list}}, $item  if ( defined($item)&& $item->isa('Rdiffopke::File')); 
+    push @{ $self->{list} }, $item if ( defined($item) && $item->isa('Rdiffopke::File') );
 }
 
 

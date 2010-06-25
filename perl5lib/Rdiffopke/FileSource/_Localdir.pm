@@ -31,37 +31,43 @@ override 'get_detailed_file_list' => sub {
 
     my $file_list = Rdiffopke::FileList->new;
     my $dir       = dir( $self->url )->cleanup->absolute;
-	# my $root_path = $dir->stringify;
-	
+    # my $root_path = $dir->stringify;
+
 ## Path::Class::Dir->recurse() follows symlinks !!! ->use File::Find instead
     #    $dir->recurse(
     #        callback => sub {
-    find({wanted=>       sub {
-            my $stat = stat($_);
-			my  $rel_path = file($File::Find::name)->relative($dir);
-			# my $rel_path = $File::Find::name;
-			# $rel_path =~ s/^$root_path\/// ;   # Not portable
-			
-            $file_list->add($rel_path,
-                Rdiffopke::File::_LocalFile->new(
-					rel_path=>$rel_path->stringify,
-                    path => $File::Find::name,
-                    mode => $stat->mode,
-                    uid  => $stat->uid,
-                    gid  => $stat->gid,
-                    size => $stat->size,
+    find(
+        {
+            wanted => sub {
+                my $stat     = stat($_);
+                my $rel_path = file($File::Find::name)->relative($dir);
+                # my $rel_path = $File::Find::name;
+                # $rel_path =~ s/^$root_path\/// ;   # Not portable
 
-                    # mtime => scalar( gmtime( $stat->mtime ) ),
-                    mtime => $stat->mtime,
-                )
-            );
-        }, no_chdir=>1, follow => 0},
+                $file_list->add(
+                    $rel_path,
+                    Rdiffopke::File::_LocalFile->new(
+                        rel_path => $rel_path->stringify,
+                        path     => $File::Find::name,
+                        mode     => $stat->mode,
+                        uid      => $stat->uid,
+                        gid      => $stat->gid,
+                        size     => $stat->size,
+
+                        # mtime => scalar( gmtime( $stat->mtime ) ),
+                        mtime => $stat->mtime,
+                    )
+                );
+            },
+            no_chdir => 1,
+            follow   => 0
+        },
         $dir->stringify,
     );
 
-	# Make sure we do not include the base directory
-	$file_list->delete('.');
-	$file_list->delete($dir);
+    # Make sure we do not include the base directory
+    $file_list->delete('.');
+    $file_list->delete($dir);
 
     return $file_list;
 };

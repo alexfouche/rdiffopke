@@ -10,9 +10,8 @@ use Exception::Class (
     },
 
     Rdiffopke::Exception::BadParams => {
-        isa => 'Rdiffopke::Exception',
-        description =>
-          'User supplied wrong parameters or input to start program',
+        isa         => 'Rdiffopke::Exception',
+        description => 'User supplied wrong parameters or input to start program',
     },
 
     Rdiffopke::Exception::FileSource => {

@@ -23,7 +23,7 @@ my $rdiffopke = Rdiffopke->new(get_params_and_input);
 $rdiffopke->prepare_repository;
 
 # Do a complete consistency check of repository
-$rdiffopke->verify_repository if ($rdiffopke->need_verify_repo);
+$rdiffopke->verify_repository if ( $rdiffopke->need_verify_repo );
 
 # Connect to source, do some checking
 $rdiffopke->prepare_source;
@@ -36,11 +36,9 @@ $rdiffopke->compare_files;
 $rdiffopke->transfer_files;
 
 # Do all report, handles close, cleanup
-$rdiffopke->terminate(0, "Terminated succesfully");
+$rdiffopke->terminate( 0, "Terminated succesfully" );
 
 exit 0;
-
-
 
 
 
@@ -55,16 +53,20 @@ exit 0;
 
 sub import_required_modules {
     my @modules =
-      qw( Moose Try::Tiny Exception::Class Getopt::Std DBI DBD::SQLite Path::Class FileHandle );
+        qw( Moose Try::Tiny Exception::Class Getopt::Std DBI DBD::SQLite Path::Class FileHandle );
 
-	# Try to include all modules and record the missing ones in @messages
+    # Try to include all modules and record the missing ones in @messages
     my $missing_modules = "";
     foreach (@modules) {
-        eval "use $_" ;
+        eval "use $_";
         $missing_modules .= "$_, " if ($@);
     }
 
-	if ($missing_modules) {Rdiffopke::Exception->throw(error=>"Some Perl modules are missing for rdiffopke to run. Missing: $missing_modules \n");}
+    if ($missing_modules) {
+        Rdiffopke::Exception->throw( error =>
+                "Some Perl modules are missing for rdiffopke to run. Missing: $missing_modules \n"
+        );
+    }
 }
 
 
@@ -89,26 +91,29 @@ sub verbose_message($) {
 }
 
 sub get_params_and_input {
-	use Getopt::Std;
-	my $getopts = {};
+    use Getopt::Std;
+    my $getopts = {};
 
     getopts( 'vu:p:d:s:ic:x', $getopts )
-      or Rdiffopke::Exception::BadParams->throw(
-        error => "Wrong command line parameters\n" );
+        or Rdiffopke::Exception::BadParams->throw( error => "Wrong command line parameters\n" );
 
     unless ( $getopts->{s} && $getopts->{d} ) {
         Rdiffopke::Exception::BadParams->throw(
             error => "Missing some required command line parameters\n" );
     }
 
-    my %feed_to_rdiffopke = (verbose=>0);
-    $feed_to_rdiffopke{verbose}        ++             if ( $getopts->{v} );
-    $feed_to_rdiffopke{no_encryption}  = 1             if ( $getopts->{x} );
-    $feed_to_rdiffopke{source_url}     = $getopts->{s} if ( $getopts->{s} );
-    $feed_to_rdiffopke{repo_url} = $getopts->{d}       if ( $getopts->{d} );
-    $feed_to_rdiffopke{need_verify_repo}  = 1             if ( $getopts->{t} );
+    my %feed_to_rdiffopke = ( verbose => 0 );
+    $feed_to_rdiffopke{verbose}++ if ( $getopts->{v} );
+    $feed_to_rdiffopke{no_encryption}    = 1             if ( $getopts->{x} );
+    $feed_to_rdiffopke{source_url}       = $getopts->{s} if ( $getopts->{s} );
+    $feed_to_rdiffopke{repo_url}         = $getopts->{d} if ( $getopts->{d} );
+    $feed_to_rdiffopke{need_verify_repo} = 1             if ( $getopts->{t} );
+    $feed_to_rdiffopke{want_rdiffbackup} = 1
+        if ( $getopts->{b} || ( !defined( $getopts->{b} ) && $getopts->{x} ) );
 
 # TODO an option to backup metadata for each rdiff (could be useful if we implement a repair function in the future)
+# TODO an option to compress files in repository
+# TODO an option to put directories and slinks in repository (so that it is functionnally equivalent to rdiff-backup). Would be the default in non encrypted mode
 
     return %feed_to_rdiffopke;
 }

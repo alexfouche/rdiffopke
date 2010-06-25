@@ -16,21 +16,21 @@ sub instance {
     my $self = shift;
 
     $_ = $self->params->{url};
-  SWITCH: {
+SWITCH: {
         /^file:\/\//
-          && do { $self->params->{url}= $self->params->{url} =~ s-^file://-- ; last SWITCH; };
+            && do { $self->params->{url} = $self->params->{url} =~ s-^file://--; last SWITCH; };
         /^sftp:\/\// && do { last SWITCH; };
         /^ftp:\/\//  && do { last SWITCH; };
     }
 
     # If we did not returned yet, maybe it is a local directory
     if ( -d $self->params->{url} ) {
-        return Rdiffopke::FileSource::_LocalDir->new(%{$self->params} );
+        return Rdiffopke::FileSource::_LocalDir->new( %{ $self->params } );
     }
 
     # We should never get there
     Rdiffopke::Exception::FileSource->throw(
-        error => "Source URL '".$self->params->{url} ."' is not recognized" );
+        error => "Source URL '" . $self->params->{url} . "' is not recognized" );
 }
 
 no Moose;

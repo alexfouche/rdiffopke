@@ -13,11 +13,11 @@ use Moose;
 use Moose::Util::TypeConstraints;
 
 subtype 'Rdiffopke::FileType' => as 'Str' =>
-  where { $_ =~ 'file' || $_ =~ 'dir' || $_ =~ 'slink' } =>
-  message { "FileType is either 'file', 'dir' or 'slink'" };
+    where { $_ =~ 'file' || $_ =~ 'dir' || $_ =~ 'slink' } =>
+    message { "FileType is either 'file', 'dir' or 'slink'" };
 
 subtype 'Rdiffopke::PositiveInt' => as 'Int' => where { $_ > 0 } =>
-  message { 'Only positive greater than zero integers accepted' };
+    message { 'Only positive greater than zero integers accepted' };
 
 no Moose;
 __PACKAGE__->meta->make_immutable;
