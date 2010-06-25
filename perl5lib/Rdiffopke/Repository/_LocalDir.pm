@@ -12,11 +12,13 @@ use File::Copy;
 use Path::Class;
 use FileHandle;
 use Try::Tiny;
+use File::Touch;
 
 extends 'Rdiffopke::Repository';
 
 has '_userkey_file'    => ( is => 'ro', isa => 'Str', writer => '_set_userkey_file' );
 has '_metadata_dbfile' => ( is => 'ro', isa => 'Str', writer => '_set_metadata_dbfile' );
+has '_touch' =>( is => 'ro', isa => 'File::Touch' , default=> sub { File::Touch->new(mtime => time, no_create => 1)});
 
 # because "after 'new'" does not work
 sub BUILD {
@@ -111,18 +113,18 @@ override '_move_files_to_last_rdiff' => sub {
     my $prev_rdiff_dir = dir( $self->url, 'data', $self->metadata->prev_rdiff )->stringify;
     my $rdiff_dir      = dir( $self->url, 'data', $self->metadata->rdiff )->stringify;
 
-# Fail if there is already a directory named after the current(new) rdiff number
+	# Fail if there is already a directory named after the current(new) rdiff number
     if ( -d $rdiff_dir ) {
         Rdiffopke::Exception::Repository->throw(
             error => "Directory '$rdiff_dir' should not already exist in the repository\n" );
     }
 
     # Fail if the previous rdiff directory is missing
-#    unless ( -d $prev_rdiff_dir ) {
-#        Rdiffopke::Exception::Repository->throw( error => "Previous rdiff directory '$prev_rdiff_dir' is missing from the repository\n" );
-#    }
-#
-# In fact there are cases when the previous rdiff_dir can be missing if the source directory was empty(ed)
+	#    unless ( -d $prev_rdiff_dir ) {
+		#        Rdiffopke::Exception::Repository->throw( error => "Previous rdiff directory '$prev_rdiff_dir' is missing from the repository\n" );
+		#    }
+		#
+		# In fact there are cases when the previous rdiff_dir can be missing if the source directory was empty(ed)
 
     if ( -d $prev_rdiff_dir ) {
         unless ( rename $prev_rdiff_dir, $rdiff_dir ) {
@@ -130,13 +132,13 @@ override '_move_files_to_last_rdiff' => sub {
                     "Can not rename '$rdiff_dir' should not already exist in the repository\n" );
         }
     }
-# else {
-#	 unless ( mkdir $rdiff_dir ) {
-#	        Rdiffopke::Exception::Repository->throw( error =>
-#	"Can not create '$rdiff_dir'\n"
-#	        );
-#	    }
-#}
+	# else {
+		#	 unless ( mkdir $rdiff_dir ) {
+			#	        Rdiffopke::Exception::Repository->throw( error =>
+				#	"Can not create '$rdiff_dir'\n"
+				#	        );
+				#	    }
+				#}
 };
 
 # See the Rdiffopke::Repository::... description in base class
@@ -167,7 +169,7 @@ override '_discard_file' => sub {
     $prev_base_dir->mkpath;
 
 
-# Build absolute path of file in repository and move it from current rdiff to previous rdiff
+   # Build absolute path of file in repository and move it from current rdiff to previous rdiff
     unless (
         move(
             file( "$base_dir",      $file_name->basename )->stringify,
@@ -179,7 +181,7 @@ override '_discard_file' => sub {
             error => "Can not move files within the repository:\n$!" );
     }
 
-# Prune the current rdiff directories if the moved file was the last file of them
+   # Prune the current rdiff directories if the moved file was the last file of them
     for ( ; rmdir $base_dir ; $base_dir = $base_dir->parent ) { }
 };
 
@@ -188,7 +190,7 @@ override '_transfer_file' => sub {
     my $self  = shift;
     my $sfile = shift;    # Should be a Rdiffopke::File representing the source file
 
-    unless ( $sfile->is_file ) {
+    unless ( $sfile->is_file || $self->want_rdiffbackup ) {
         Rdiffopke::Exception::Repository->throw(
             error => "Can not transfer other file types than 'file' to the repository:\n" );
     }
@@ -203,12 +205,12 @@ override '_transfer_file' => sub {
     # From now, $sfile is Rdiffopke::File, $rfile is Path::Class::File, and $rfile_h is FileHandle
 
     # $rfile_h will be the repository file written
-    my $rfile_h = FileHandle->new( '>' . file( $base_dir, $rfile->basename )->stringify );
+    my $rfile_h = FileHandle->new( '>' . $rfile->stringify );
     unless ( defined $rfile_h ) {
         Rdiffopke::Exception::Repository->throw( error => "Can not create file in repository\n" );
     }
 
-# Why don't we use File::Copy ? Because source file can come from anywhere, not only local filesystem, this is the reason the Rdiffopke::File virtual object exists
+   # Why don't we use File::Copy ? Because source file can come from anywhere, not only local filesystem, this is the reason the Rdiffopke::File virtual object exists
     $sfile->open_r;
     my $buffer;
     while ( $sfile->read($buffer) ) {
@@ -217,12 +219,17 @@ override '_transfer_file' => sub {
                     . file( $base_dir, $rfile->basename )->stringify
                     . "' in repository\n" );
         }
-
     }
     $sfile->close;
     $rfile_h->close;
 
-    my $stat = $rfile->stat;
+	# Touch the file
+	if ($self->want_rdiffbackup){
+		$self->_touch->{_mtime} = $sfile->mtime; # This object interface of File::Touch is very impractical
+		$self->touch($rfile->stringify);
+	}
+
+    my $stat = $rfile->lstat;
     # returns a small array [localpath, 'mtime', 'size'] of the file stored in the repository
     return [ $rfile_rel_path, $stat->mtime, $stat->size ];
 };

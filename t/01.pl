@@ -292,6 +292,10 @@ mkdir file($sourcedir->dirname, 'file1')->stringify;
 $rdiffopke->compare_files;
 $rdiffopke->transfer_files;
 # Created rdiff is 7
+# Repository
+#	3 file1 (abc)
+#	5 file1 (abc)
+#	7 file2 (blabla)
 
 ok(!-e dir($repodir->dirname,'data', '4')->stringify, 'dir for rdiff 4 does not exists');
 ok(-d dir($repodir->dirname,'data', '3')->stringify, 'dir for rdiff 3 exists');
@@ -330,11 +334,6 @@ is($path, undef, 'file1 (file) is not in rdiff 7');
 ($path) =$metadata_dbh->selectrow_array("select paths.path  from files, paths where rdiff=7 and  paths.path='file1' and files.path_id=paths.path_id and files.type='dir';");
 is($path, 'file1', 'file1 (dir) is in repo rdiff 7');
 
-
-diag("Temp source directory: sdir=".$sourcedir->dirname);
-diag("Temp repo directory: rdir=".$repodir->dirname);
-$DB::single=1;
-
 my $can_symlink = (eval { symlink("", ""); }, $@ eq "");
 if ( $can_symlink){
 	symlink( '/bin/ls', file($sourcedir->dirname, 'link1')->stringify );
@@ -358,6 +357,13 @@ if ( $can_symlink){
 $rdiffopke->compare_files;
 $rdiffopke->transfer_files;
 # Created rdiff is 8
+# Repository
+#	3 file1 (abc)
+#	5 file1 (abc)
+#	8 file2 (blabla)
+#   8 link2 ($sourcedir->dirname / file2)
+#   8 link3 (file2)
+#   8 link4 ($sourcedir->dirname /file1/../ file2)
 
 SKIP: {
     skip 'Platform does not support symlinks', 9 unless $can_symlink;
@@ -386,10 +392,51 @@ SKIP: {
 	}
 }
 
+my $file3_h=create_file($sourcedir->dirname, 'file3', 'something');
+my $stat_file3_mtime = file($sourcedir->dirname, 'file3')->stat->mtime;
+sleep 2;
 
 
+diag("Temp source directory: sdir=".$sourcedir->dirname);
+diag("Temp repo directory: rdir=".$repodir->dirname);
+$DB::single=1;
 
+# Source
+#   file1 <- is a directory
+#   file2 (blabla)
+#   link1 (/bin/ls)
+#   link2 ($sourcedir->dirname / file2)
+#   link3 (file2)
+#   link4 ($sourcedir->dirname /file1/../ file2)
+#   file3 (something)
+# Repository
+#   3 file1 (abc)
+#   6 file1 (abc)
+#	8 file1 <- is a directory
+#   8 file2 (blabla)
+#   8 link2 ($sourcedir->dirname / file2)
+#   8 link3 (file2)
+#   8 link4 ($sourcedir->dirname /file1/../ file2)
+$rdiffopke->compare_files;
+$rdiffopke->transfer_files;
+# Created rdiff is 9
+# Repository
+#	3 file1 (abc)
+#	5 file1 (abc)
+#	9 file2 (blabla)
+#   9 link2 ($sourcedir->dirname / file2)
+#   9 link3 (file2)
+#   9 link4 ($sourcedir->dirname /file1/../ file2)
+#   9 file3(something)
 
+ok(-f file($repodir->dirname,'data', '9', 'file3')->stringify, 'file3 (file) for rdiff 9 does not exists');
+my ($smtime,$rmtime);
+($path,$smtime,$rmtime) =$metadata_dbh->selectrow_array("select paths.path, files.mtime, localfiles.mtime  from files, paths, localfiles where rdiff=9 and  paths.path='file3' and files.path_id=paths.path_id and files.localfile_id=localfiles.localfile_id;");
+is($path, 'file3', 'file3 (dir) is in repo rdiff 9');
+is($smtime,$stat_file3_mtime, 'mtime for source correctly stored in metadata');
+is($rmtime,$stat_file3_mtime, 'mtime for repository correctly stored in metadata');
+is($rmtime,file($repodir->dirname,'data', '9', 'file3')->lstat->mtime, 'mtime for repository correctly stored in repository' );
 
+$DB::single=1;
 
 done_testing;
