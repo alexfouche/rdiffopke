@@ -104,8 +104,11 @@ is($metadata_dbh->selectrow_array('select count(*) from localfiles;'), 0, 'Check
 is($metadata_dbh->selectrow_array('select count(*) from keys;'), 0, 'Check if metadata keys table is empty');
 is($metadata_dbh->selectrow_array('select count(*) from options;'), 1, 'Only 1 option in fresh metadata');
 
+# Empty source
+# Empty repository
 $rdiffopke->compare_files;
 $rdiffopke->transfer_files;
+# Created rdiff is 1
 
 is($metadata_dbh->selectrow_array('select count(*) from rdiffs;'), 1, 'Only 1 rdiff in metadata');
 is($metadata_dbh->selectrow_array('select max(rdiff) from rdiffs;'), 1, 'Latest rdiff is 1');
@@ -121,9 +124,11 @@ ok(-l file($repodir->dirname,'data', '_latest_rdiff')->stringify, 'slink latest_
 ok(!-e dir($repodir->dirname,'data', '0')->stringify, 'dir for rdiff 0 missing');
 ok(!-e dir($repodir->dirname,'data', '1')->stringify, 'dir for rdiff 1 missing');
 
-
+# Empty source
+# Empty repository
 $rdiffopke->compare_files;
 $rdiffopke->transfer_files;
+# Created rdiff is 2
 
 ok(-f file($repodir->dirname,'metadata')->stringify, 'Metadata file still there');
 ok(!-f file($repodir->dirname,'pubkey')->stringify, 'Public key file still not there');
@@ -143,8 +148,12 @@ is($metadata_dbh->selectrow_array('select count(*) from keys;'), 0, 'Check if me
 
 create_file($sourcedir->dirname, 'file1', 'abc');
 
+# Source
+#	file1 (abc)
+# Empty repository
 $rdiffopke->compare_files;
 $rdiffopke->transfer_files;
+# Created rdiff is 3
 
 ok(-f file($repodir->dirname,'metadata')->stringify, 'Metadata file still there');
 ok(!-f file($repodir->dirname,'pubkey')->stringify, 'Public key file still not there');
@@ -172,8 +181,12 @@ is($path, undef, 'file1 is no more in rdiff 2');
 
 unlink file($sourcedir->dirname, 'file1')->stringify;
 
+# Source empty
+# Repository
+#	3 file1 (abc)
 $rdiffopke->compare_files;
 $rdiffopke->transfer_files;
+# Created rdiff is 4
 
 ok(!-e dir($repodir->dirname,'data', '4')->stringify, 'dir for rdiff 4 does not exists');
 ok(-d dir($repodir->dirname,'data', '3')->stringify, 'dir for rdiff 3 exists');
@@ -188,8 +201,14 @@ is($path, undef, 'file1 is not in rdiff 4');
 my $file1_h=create_file($sourcedir->dirname, 'file1', 'abc');
 my $file2_h=create_file($sourcedir->dirname, 'file2', 'blabla');
 
+# Source
+#	file1 (abc)
+#	file2 (blabla)
+# Repository
+#	3 file1 (abc)
 $rdiffopke->compare_files;
 $rdiffopke->transfer_files;
+# Created rdiff is 5
 
 ok(!-e dir($repodir->dirname,'data', '4')->stringify, 'dir for rdiff 4 does not exists');
 ok(-d dir($repodir->dirname,'data', '3')->stringify, 'dir for rdiff 3 exists');
@@ -214,8 +233,20 @@ is($type, 'file', 'file2 is type file');
 
 $file1_h=create_file($sourcedir->dirname, 'file1', 'something');
 
+# Source
+#	file1 (something)
+#	file2 (blabla)
+# Repository
+#	3 file1 (abc)
+#	5 file1 (abc)
+#	5 file2 (blabla)
 $rdiffopke->compare_files;
 $rdiffopke->transfer_files;
+# Created rdiff is 6
+# Repository
+#	3 file1 (abc)
+#	5 file1 (abc)
+#	6 file2 (blabla)
 
 ok(!-e dir($repodir->dirname,'data', '4')->stringify, 'dir for rdiff 4 does not exists');
 ok(-d dir($repodir->dirname,'data', '3')->stringify, 'dir for rdiff 3 exists');
@@ -253,13 +284,18 @@ mkdir file($sourcedir->dirname, 'file1')->stringify;
 
 diag("Temp source directory: sdir=".$sourcedir->dirname);
 diag("Temp repo directory: rdir=".$repodir->dirname);
-
 $DB::single=1;
 
+# Source
+#	file1 <- is a directory
+#	file2 (blabla)
+# Repository
+#	3 file1 (abc)
+#	6 file1 (abc)
+#	6 file2 (blabla)
 $rdiffopke->compare_files;
 $rdiffopke->transfer_files;
-
-
+# Created rdiff is 7
 
 ok(!-e dir($repodir->dirname,'data', '4')->stringify, 'dir for rdiff 4 does not exists');
 ok(-d dir($repodir->dirname,'data', '3')->stringify, 'dir for rdiff 3 exists');
@@ -297,8 +333,6 @@ ok(!-f file($repodir->dirname,'data', '7', 'file1')->stringify, 'file1 (file) fo
 is($path, undef, 'file1 (file) is not in rdiff 7');
 ($path) =$metadata_dbh->selectrow_array("select paths.path  from files, paths where rdiff=7 and  paths.path='file1' and files.path_id=paths.path_id and files.type='dir';");
 is($path, 'file1', 'file1 (dir) is in repo rdiff 7');
-
-
 
 
 

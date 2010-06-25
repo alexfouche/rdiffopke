@@ -150,10 +150,14 @@ override '_discard_file' => sub {
     my $self = shift;
     my $file = shift;    # Should be a Rdiffopke::File
 
-# Commented because $file is the source file, and it might be a directory, while it was previously a file (and so is a file in the repository)
-#    unless ( $file->is_file ) {
-#        Rdiffopke::Exception::Repository->throw( error =>"Can not discard other file types than 'file' from the repository:\n" );
-#    }
+	# Commented because :
+	# There is a case when a file on the source has been replaced by something which is not a "file" (eg a folder), and has same path+name
+	# Nevertheless, the current function is given the source file in $sfile, which in this specific case is not of type 'file'
+	# So having the check below would prevent the file in repository from the previous rdiffopke run to be moved to previous rdiff
+	# So instead, we will do a real check if the file exists in repo and move it if it exists
+	# unless ( $file->is_file ) {
+	#     Rdiffopke::Exception::Repository->throw( error =>"Can not discard other file types than 'file' from the repository:\n" );
+	# }
 
     my $file_name = file( $self->url ,'data',$self->metadata->rdiff , $file->rel_path ); # Use ',' construction to make it portable
 
@@ -185,19 +189,12 @@ override '_transfer_file' => sub {
     my $sfile =  shift;    # Should be a Rdiffopke::File representing the source file
 
     unless ( $sfile->is_file ) {
-        Rdiffopke::Exception::Repository->throw( error =>
-"Can not transfer other file types than 'file' to the repository:\n"
-        );
+        Rdiffopke::Exception::Repository->throw( error => "Can not transfer other file types than 'file' to the repository:\n" );
     }
 
     # First we recreate the original arborescence
 	my $rfile_rel_path = $sfile->rel_path;
     my $rfile = file($self->url, 'data', $self->metadata->rdiff ,  $sfile->rel_path ); # Use ',' construction to make it portable
-    #my $base_dir =
-    #  dir(  $self->url 
-    #      . "/data/"
-    #      . $self->metadata->rdiff . '/'
-    #      . $rfile_name->dir->stringify );
 	my $base_dir = $rfile->dir;
     $base_dir->mkpath;
 

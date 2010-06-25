@@ -279,7 +279,7 @@ where rdiff=$rdiff and files.path_id=paths.path_id and files.type != 'file' ;"
 
 # push modified metadata  to previous rdiff
 # try/catch and DB transactional part are managed by the caller
-sub _discard_file_metadata {
+sub _discard_file {
     my $self = shift;
     my $file = shift;    # Should be a Rdiffopke::File
 
@@ -305,14 +305,14 @@ sub _discard_file_metadata {
 	if(!defined $file_id){ return;}
 
     # Update the record to belong to previous revision
-    $self->_dbh->do( "update files set rdiff=" . $self->prev_rdiff    . ", uid='" . $file->uid . "', gid='"  . $file->gid   . "', mode='"  . $file->mode     . "', mtime='" . $file->mtime  . "', type='"   . $file->type  . "', size="    . $file->size . " where file_id=$file_id;" );
+    # $self->_dbh->do( "update files set rdiff=" . $self->prev_rdiff    . ", uid='" . $file->uid . "', gid='"  . $file->gid   . "', mode='"  . $file->mode     . "', mtime='" . $file->mtime  . "', type='"   . $file->type  . "', size="    . $file->size . " where file_id=$file_id;" );
 	$self->_dbh->do( "update files set rdiff=" . $self->prev_rdiff ." where file_id=$file_id;" );
     return $path_id;
 }
 
 # Add a new file metadata, meaning a new record in 'files' table
 # try/catch and DB transactional part are managed by the caller
-sub _add_file_metadata {
+sub _add_file {
     my $self    = shift;
     my $file    = shift;    # Should be a Rdiffopke::File
     my $path_id = shift
@@ -320,7 +320,6 @@ sub _add_file_metadata {
     my $localfile = shift
       ; # localfile is a small array [localpath, 'mtime', 'size'], needed if we want to insert a file transferred to repository
 
-$DB::single=1;
     unless ( defined $path_id ) {
 
 # If the path does not already exists, add a path entry in database
@@ -388,7 +387,7 @@ sub discard_file {
         $self->_dbh->begin_work;
 
         # Discard the file metadata to previous revision
-        $path_id= $self->_discard_file_metadata($file);
+        $path_id= $self->_discard_file($file);
 
         # There is nothing to do for the file content (localfiles table)
     }
@@ -403,46 +402,24 @@ sub discard_file {
 	return $path_id;
 }
 
-# push modified metadata to previous rdiff and replace with a new one
-sub replace_file_metadata {
-    my $self = shift;
-    my $file = shift;    # Should be a Rdiffopke::File
-
-    try {
-        $self->_dbh->begin_work;
-
-        # Discard the file metadata to previous rdiff
-        my $path_id = $self->_discard_file_metadata($file);
-
-        # add a new the file metadata to current rdiff with same $path_id
-        $self->_add_file_metadata($file, $path_id);
-    }
-    catch {
-        $self->_dbh->rollback;
-        Rdiffopke::Exception::Metadata->throw(
-            error => "Error occurred while updating metadata:\n"
-              . $self->_dbh->errstr );
-    };
-    $self->_dbh->commit;
-}
 
 # recreate update metadata and associate reference to a new file in repository
-sub add_file {
+sub discard_add_file {
     my $self = shift;
     my $file = shift;    # Should be a Rdiffopke::File
     my $localfile =
-      shift;    # localfile is a small array [localpath, 'mtime', 'size', optional path_id]
+      shift;    # localfile is a -optional- small array [localpath, 'mtime', 'size', optional path_id]
 
     eval {
         $self->_dbh->begin_work;
 
         # Discard the file metadata to previous rdiff
 		# Commented because it is already done in the caller Repository->transfer_files()
-        # my $path_id = $self->_discard_file_metadata($file);
+        my $path_id = $self->_discard_file($file);
 
         # add a new the file metadata to current rdiff
         # $self->_add_file_metadata( $file, $path_id, $localfile );
-        $self->_add_file_metadata( $file, $localfile->[3], $localfile );
+        $self->_add_file( $file, $path_id, $localfile );
     }
     ;if($@) {
         $self->_dbh->rollback;

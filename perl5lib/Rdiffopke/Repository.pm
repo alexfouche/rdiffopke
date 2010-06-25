@@ -290,19 +290,18 @@ sub transfer_files {
 # This means a discard of current file in repository to previous rdiff, and add source file to new rdiff
 # $_ is a Rdiffopke::File instance
     foreach ( @{ $self->list_files_to_transfer } ) {
-        my $path_id = $self->metadata->discard_file($_)
-          ;    # push modified metadata and file content to previous rdiff
-        $self->_discard_file($_)
-          ; # if ( $_->is_file );    # push repository file to previous rdiff folder
+        # push repository file to previous rdiff folder
+		# "if ( $_->is_file );" commented because :
+		# There is a case when a file on the source has been replaced by something which is not a "file" (eg a folder), and has same path+name
+		# Nevertheless, the current function is given the source file in $_, which in this specific case is not of type 'file'
+		# So having the check below would prevent the file in repository from the previous rdiffopke run to be moved to previous rdiff
+		$self->_discard_file($_); # if ( $_->is_file );    
 
-# $localfile is a small array [localpath, 'mtime', 'size'] of the file stored in the repository
-        my $localfile = $self->_transfer_file($_)
-          if ( $_->is_file )
-          ; # Transfer the file from source to repository in new rdiff directory
+		# Transfer the file from source to repository in new rdiff directory
+		# $localfile is a small array [localpath, 'mtime', 'size'] of the file stored in the repository
+        my $localfile = $self->_transfer_file($_) if ( $_->is_file );
 
-		push @$localfile, $path_id;
-        $self->metadata->add_file( $_, $localfile )
-          ; # recreate update metadata and associate reference to file in repository
+        $self->metadata->discard_add_file( $_, $localfile )          ; # recreate update metadata and associate reference to file in repository
     }
     $self->_set_list_files_to_transfer( [] );    # can't hurt
 
@@ -311,7 +310,7 @@ sub transfer_files {
 # This will not transfer file content from source to repository. Content is believed to be the same as the one already stored in repo
 # $_ is a Rdiffopke::File instance
     foreach ( @{ $self->list_files_to_update_metadata } ) {
-        $self->metadata->replace_file_metadata($_)
+        $self->metadata->discard_add_file($_)
           ; # push modified metadata to previous rdiff and replace with a new one
     }
     $self->_set_list_files_to_update_metadata( [] );    # can't hurt
@@ -366,9 +365,9 @@ sub verify {
     # Here verify parts generic for all repository implementations
 
     # Here verify parts that are only relevant to metadata alone
-    $self->metadata->verify;
+    my $somedata = $self->metadata->verify;
 
-  # Here verify parts that are relevant to specific implementation of repository
+  # Here verify parts that are relevant to specific implementation of repository, against data from metadata
     $self->_verify;
 
     # TODO
